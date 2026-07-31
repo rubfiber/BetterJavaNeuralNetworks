@@ -1,7 +1,8 @@
 package org.network.neuron;
 
 public interface Neuron {
-    public void initialize();
+    public void initializeHiddenLayers();
+    public void initializeOutputLayer();
     public float neuronCompute(float[] weights, float bias, float[] input, boolean isOutLayer);
 
     public float getWeights(int neuronIdx);
