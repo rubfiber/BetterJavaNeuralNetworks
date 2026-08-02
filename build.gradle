@@ -1,7 +1,11 @@
 plugins {
     id 'java'
 }
-
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+}
 group = 'org.example'
 version = '1.0-SNAPSHOT'
 
@@ -13,6 +17,7 @@ dependencies {
     testImplementation platform('org.junit:junit-bom:6.0.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    implementation 'io.github.beehive-lab:tornado-api:5.0.0-jdk25'
 }
 
 test {

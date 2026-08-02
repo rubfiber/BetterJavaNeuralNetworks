@@ -23,13 +23,11 @@ public class Main {
                 { 1.0f},
                 {-1.0f}
         };
-
-        System.out.println("Predictions BEFORE training:");
+        System.out.println("XOR based on inputs:" +  Arrays.deepToString(trainingData));
+        System.out.println("Predictions before training:");
         for (float[] datum : trainingData) {
             System.out.println(Arrays.toString(network.predict(datum)));
         }
-
-        System.out.println("\nStarting training...");
 
         long startTime = System.nanoTime();
         network.train(trainingData, targetData, 100000, 0.1f);
@@ -39,7 +37,7 @@ public class Main {
         double durationMs = durationNs / 1_000_000.0;
 
 
-        System.out.println("\nPredictions AFTER training:");
+        System.out.println("Predictions after training:");
         for (float[] trainingDatum : trainingData) {
             System.out.println(Arrays.toString(network.predict(trainingDatum)));
         }

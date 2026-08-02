@@ -7,6 +7,12 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.Random;
 
+import uk.ac.manchester.tornado.api.TaskGraph;
+import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
+import uk.ac.manchester.tornado.api.annotations.Parallel;
+import uk.ac.manchester.tornado.api.enums.DataTransferMode;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
+
 public class FeedForwardNetwork implements Network, Neuron{
     int inputSize;
     int hiddenLayerWidth;
@@ -287,30 +293,6 @@ public class FeedForwardNetwork implements Network, Neuron{
         for (int i = 1; i < outputSize; i++) {
             outputLayerWeights[i] =  random.nextFloat(-outputLayerLimit, outputLayerLimit);
         }
-    }
-
-    @Override
-    public float neuronCompute(float[] weights, float bias, float[] input, boolean isOutLayer) {
-        assert input != null : "Input is null";
-        assert weights != null : "Weights is null";
-        assert input.length == weights.length;
-
-        float sum = 0.0f;
-        for (int i = 0; i < input.length; i++) {
-            sum += input[i] * weights[i];
-        }
-        sum += bias;
-        float activated;
-        if (isOutLayer) {
-            activated = (float) Math.tanh(sum);
-        } else {
-            activated = sigmoid(sum);
-        }
-
-        if (Float.isNaN(activated) || Float.isInfinite(activated))
-            throw new IllegalStateException("NaN or Infinity in compute(). Sum=" + sum);
-
-        return activated;
     }
 
     @Override
