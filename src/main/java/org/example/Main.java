@@ -4,11 +4,45 @@ import org.network.FeedForward.FeedForwardNetwork;
 
 import java.util.Arrays;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
-    static FeedForwardNetwork network = new FeedForwardNetwork(3, 4, 2, 4);
     public static void main(String[] args) {
-        System.out.println(Arrays.toString(network.predict(new float[]{0.2f, 0.3f, 0.2f})));
+        FeedForwardNetwork network = new FeedForwardNetwork(2, 4, 2, 1);
+
+        // XOR
+        float[][] trainingData = {
+                {0.0f, 0.0f},
+                {0.0f, 1.0f},
+                {1.0f, 0.0f},
+                {1.0f, 1.0f}
+        };
+
+        //-1 false, 1 true
+        float[][] targetData = {
+                {-1.0f},
+                { 1.0f},
+                { 1.0f},
+                {-1.0f}
+        };
+
+        System.out.println("Predictions BEFORE training:");
+        for (float[] datum : trainingData) {
+            System.out.println(Arrays.toString(network.predict(datum)));
+        }
+
+        System.out.println("\nStarting training...");
+
+        long startTime = System.nanoTime();
+        network.train(trainingData, targetData, 100000, 0.1f);
+        long endTime = System.nanoTime();
+
+        long durationNs = endTime - startTime;
+        double durationMs = durationNs / 1_000_000.0;
+
+
+        System.out.println("\nPredictions AFTER training:");
+        for (float[] trainingDatum : trainingData) {
+            System.out.println(Arrays.toString(network.predict(trainingDatum)));
+        }
+        System.out.println("Time in ms: " + durationMs);
     }
 }

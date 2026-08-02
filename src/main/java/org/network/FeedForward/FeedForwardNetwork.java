@@ -19,6 +19,9 @@ public class FeedForwardNetwork implements Network, Neuron{
 
     float[][] hiddenLayerOutputs;
 
+    float[][] hiddenLayerDeltas;
+    float[] outputLayerDeltas;
+
     public FeedForwardNetwork(int inputSize, int hiddenLayerWidth, int hiddenLayerDepth, int outputSize) {
         this.inputSize = inputSize;
         this.hiddenLayerWidth = hiddenLayerWidth;
@@ -48,11 +51,119 @@ public class FeedForwardNetwork implements Network, Neuron{
             hiddenLayerOutputs[i] = new float[hiddenLayerWidth];
         }
         hiddenLayerOutputs[hiddenLayerDepth - 1] = new float[outputSize];
+
+        hiddenLayerDeltas = new float[hiddenLayerDepth][];
+        for  (int i = 0; i < hiddenLayerDepth-1; i++) {
+            hiddenLayerDeltas[i] = new float[hiddenLayerWidth];
+        }
+        hiddenLayerDeltas[hiddenLayerDepth - 1] = new float[outputSize];
+        outputLayerDeltas = new float[outputSize];
+
+    }
+
+    public void trainLoop(float[] test, float[] desiredOutputs, float learningRate) {
+        //forward pass
+        float[] output = predict(test); //fill up hiddenLayerOutputs and output
+        for (int i =  0; i < outputSize; i++) {
+            float neuronOutput = output[i];
+            outputLayerDeltas[i] = (neuronOutput - desiredOutputs[i]) * (1.0f - neuronOutput * neuronOutput);
+        }
+
+        //propagate error backwards
+        for (int layer = hiddenLayerDepth - 2; layer >= 0; layer--) {
+            float[] layerDeltas = hiddenLayerDeltas[layer]; //the size can change if the size of the layer changes
+            float[] nextLayerDeltas;
+            float[] connectingWeights = hiddenLayerWeights[layer + 1];
+
+            int currentWidth = layerDeltas.length;
+            int nextWidth;
+            if (layer == hiddenLayerDepth - 2) {
+                nextLayerDeltas = outputLayerDeltas;
+                nextWidth = outputSize;
+            } else {
+                nextLayerDeltas = hiddenLayerDeltas[layer + 1];
+                nextWidth = hiddenLayerWidth;
+            }
+            //get deltas
+            for (int neuron = 0; neuron < currentWidth; neuron++) {
+                float blameSum = 0;
+                for (int nextNeuron = 0; nextNeuron < nextWidth; nextNeuron++) {
+                    int weight = (nextNeuron * currentWidth) + neuron;
+                    blameSum += nextLayerDeltas[nextNeuron] * connectingWeights[weight];
+                }
+                float layerOutput = hiddenLayerOutputs[layer][neuron];
+                layerDeltas[neuron] = blameSum * (layerOutput * (1.0f - layerOutput));
+            }
+        }
+        for (int layer = 0; layer < hiddenLayerDepth; layer++) {
+            float[] targetDeltas;
+            float[] sourceOutputs;
+            float[] currentWeights = hiddenLayerWeights[layer];
+            float[] currentBiases = hiddenLayerBias[layer];
+
+            int targetWidth;
+            int sourceWidth;
+
+            // check location (start, end, or middle)
+            if (layer == 0) {
+                targetDeltas = hiddenLayerDeltas[0];
+                sourceOutputs = test;
+                targetWidth = hiddenLayerWidth;
+                sourceWidth = inputSize;
+            } else if (layer == hiddenLayerDepth - 1) {
+                targetDeltas = outputLayerDeltas;
+                sourceOutputs = hiddenLayerOutputs[layer - 1];
+                targetWidth = outputSize;
+                sourceWidth = hiddenLayerWidth;
+            } else {
+                targetDeltas = hiddenLayerDeltas[layer];
+                sourceOutputs = hiddenLayerOutputs[layer - 1];
+                targetWidth = hiddenLayerWidth;
+                sourceWidth = hiddenLayerWidth;
+            }
+
+            int weightIndex = 0;
+
+            // LINEAR MEMORY ACCESS: Target is outer loop, Source is inner loop
+            for (int targetNeuron = 0; targetNeuron < targetWidth; targetNeuron++) {
+                float targetDelta = targetDeltas[targetNeuron];
+
+                for (int sourceNeuron = 0; sourceNeuron < sourceWidth; sourceNeuron++) {
+                    float adjust = learningRate * targetDelta * sourceOutputs[sourceNeuron];
+                    currentWeights[weightIndex] -= adjust;
+                    weightIndex++;
+                }
+
+                // Update the bias for the target neuron
+                currentBiases[targetNeuron] -= learningRate * targetDelta;
+            }
+        }
     }
 
     @Override
-    public float[] train(float[] test, float[] desiredOutputs) {
-        return new float[0];
+    public void train(float[][] input, float[][] desiredOutputs, int epochs, float learningRate) {
+        int numSamples = input.length;
+
+        int[] indices = new int[numSamples];
+        for (int i = 0; i < numSamples; i++) {
+            indices[i] = i;
+        }
+
+        Random random = new Random();
+        for (int epoch = 0; epoch < epochs; epoch++) {
+            for (int i = 0; i < numSamples; i++) {
+                int swap = random.nextInt(numSamples);
+                int temp = indices[i];
+                indices[i] = indices[swap];
+                indices[swap] = temp; //swap temp and swap (data is shuffled now)
+            }
+            for (int i = 0; i < numSamples; i++) {
+                float[] currentInput = input[i];
+                float[] currentExpectedOutput = desiredOutputs[i];
+                trainLoop(currentInput, currentExpectedOutput, learningRate);
+            }
+
+        }
     }
 
     @Override
@@ -86,12 +197,11 @@ public class FeedForwardNetwork implements Network, Neuron{
             float[]  layerBias = hiddenLayerBias[layer];
             float[] layerOutputs =  hiddenLayerOutputs[layer];
             float[] layerInput = hiddenLayerOutputs[layer-1];
-            int hiddenLayerInputLength = layerInput.length;
             int middleWeightIndex = 0;
             for (int neuron = 0; neuron < hiddenLayerWidth; neuron++) {
                 float sum = 0.0f;
-                for (int in = 0; in < hiddenLayerInputLength; in++) {
-                    sum += layerInput[in] * layerWeights[middleWeightIndex++];
+                for (float v : layerInput) {
+                    sum += v * layerWeights[middleWeightIndex++];
                 }
                 sum += layerBias[neuron];
 

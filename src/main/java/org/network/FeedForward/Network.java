@@ -5,7 +5,7 @@ import java.nio.file.Path;
 
 public interface Network {
 
-    public float[] train(float[] test, float[] desiredOutputs);
+    public void train(float[][] inputs, float[][] desiredOutputs, int epochs, float learningRate);
     public float[] predict(float[] input);
 
     public void loadState(File file);
