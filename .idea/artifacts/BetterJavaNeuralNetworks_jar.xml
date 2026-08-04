@@ -1,0 +1,26 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="BetterJavaNeuralNetworks:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/BetterJavaNeuralNetworks_jar</output-path>
+    <root id="archive" name="BetterJavaNeuralNetworks.jar">
+      <element id="module-output" name="BetterJavaNeuralNetworks.main" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-api/2.25.4/89ff2217b193fb187b134aa6ebcbfa8a28b018a9/log4j-api-2.25.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/net.sf.jopt-simple/jopt-simple/4.6/306816fb57cf94f108a43c95731b08934dcae15c/jopt-simple-4.6.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.openjdk.jmh/jmh-core/1.29/c801e462e04b8403c93efb21b9d039689a0c6bd7/jmh-core-1.29.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-engine/6.0.0/aae84943a45a3c181850158d6c022ae7a9d315b4/junit-platform-engine-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.commons/commons-math3/3.2/ec2544ab27e110d2d431bdad7d538ed509b21e62/commons-math3-3.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.opentest4j/opentest4j/1.3.0/152ea56b3a72f655d4fd677fc0ef2596c3dd5e6e/opentest4j-1.3.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-launcher/6.0.0/725664fe4d930bfe48f8c058da2b8f87ee4bb94c/junit-platform-launcher-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-api/6.0.0/62298bd63312a3209c6a464aa8f6a008f960aecd/junit-jupiter-api-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-params/6.0.0/703a536ae0e72bf432c35ce3eed770a38fdcedde/junit-jupiter-params-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/io.github.beehive-lab/tornado-api/5.0.0-jdk25/f66f7f89f0f2171d1f4861151e0d15a450b4466e/tornado-api-5.0.0-jdk25.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.graalvm.sdk/collections/25.0.2/6e921cc0f9986aff40cb6b96f17c669c18d858c7/collections-25.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter/6.0.0/aafc31736e48b20d00287c9739ad6eac8eed2baf/junit-jupiter-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.platform/junit-platform-commons/6.0.0/2114748f1415dbe3c9820b8695a72aaa3c5e6ed/junit-platform-commons-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.apache.logging.log4j/log4j-core/2.25.4/b963c3d6bfdf05c61ad47a74e9f9295131607df2/log4j-core-2.25.4.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.graalvm.sdk/nativeimage/25.0.2/51871243791b4ba45af46df4ad5e8a35393d1044/nativeimage-25.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.junit.jupiter/junit-jupiter-engine/6.0.0/ef749198d6e4c780f676271964bdb11e29f5f041/junit-jupiter-engine-6.0.0.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.graalvm.polyglot/polyglot/25.0.2/ae7722e14f72efac7172bf66d92c3fd9266ed151/polyglot-25.0.2.jar" path-in-jar="/" />
+      <element id="extracted-dir" path="$USER_HOME$/.gradle/caches/modules-2/files-2.1/org.graalvm.sdk/word/25.0.2/2f4e3c92bba118d3adab969956e5ea3d66e96d18/word-25.0.2.jar" path-in-jar="/" />
+    </root>
+  </artifact>
+</component>

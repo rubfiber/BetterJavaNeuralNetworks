@@ -30,7 +30,7 @@ public class Main {
         }
 
         long startTime = System.nanoTime();
-        network.train(trainingData, targetData, 100000, 0.1f);
+        network.trainDataset(trainingData, targetData, 100000, 1, 0.01f);
         long endTime = System.nanoTime();
 
         long durationNs = endTime - startTime;
@@ -41,6 +41,6 @@ public class Main {
         for (float[] trainingDatum : trainingData) {
             System.out.println(Arrays.toString(network.predict(trainingDatum)));
         }
-        System.out.println("Time in ms: " + durationMs);
+        System.out.println("Training time in ms: " + durationMs);
     }
 }

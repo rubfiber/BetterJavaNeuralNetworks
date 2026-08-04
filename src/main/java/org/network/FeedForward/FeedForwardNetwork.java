@@ -31,6 +31,9 @@ public class FeedForwardNetwork implements Network, Neuron{
     float[][] hiddenLayerDeltas;
     float[] outputLayerDeltas;
 
+    public float[][] weightGradients;
+    public float[][] biasGradients;
+
     public FeedForwardNetwork(int inputSize, int hiddenLayerWidth, int hiddenLayerDepth, int outputSize) {
         this.inputSize = inputSize;
         this.hiddenLayerWidth = hiddenLayerWidth;
@@ -68,42 +71,17 @@ public class FeedForwardNetwork implements Network, Neuron{
         hiddenLayerDeltas[hiddenLayerDepth - 1] = new float[outputSize];
         outputLayerDeltas = new float[outputSize];
 
+        weightGradients = new float[hiddenLayerDepth][];
+        weightGradients[0] = new float[inputSize * hiddenLayerWidth];
+        for (int i = 1; i < hiddenLayerDepth - 1; i++) {
+            weightGradients[i] = new float[hiddenLayerWidth * hiddenLayerWidth];
+        }
+        weightGradients[hiddenLayerDepth - 1] = new float[hiddenLayerWidth * outputSize];
+
+        biasGradients = new float[hiddenLayerDepth][hiddenLayerWidth];
     }
 
-    public void trainLoop(float[] test, float[] desiredOutputs, float learningRate) {
-        //forward pass
-        float[] output = predict(test); //fill up hiddenLayerOutputs and output
-        for (int i =  0; i < outputSize; i++) {
-            float neuronOutput = output[i];
-            outputLayerDeltas[i] = (neuronOutput - desiredOutputs[i]) * (1.0f - neuronOutput * neuronOutput);
-        }
-
-        //propagate error backwards
-        for (int layer = hiddenLayerDepth - 2; layer >= 0; layer--) {
-            float[] layerDeltas = hiddenLayerDeltas[layer]; //the size can change if the size of the layer changes
-            float[] nextLayerDeltas;
-            float[] connectingWeights = hiddenLayerWeights[layer + 1];
-
-            int currentWidth = layerDeltas.length;
-            int nextWidth;
-            if (layer == hiddenLayerDepth - 2) {
-                nextLayerDeltas = outputLayerDeltas;
-                nextWidth = outputSize;
-            } else {
-                nextLayerDeltas = hiddenLayerDeltas[layer + 1];
-                nextWidth = hiddenLayerWidth;
-            }
-            //get deltas
-            for (int neuron = 0; neuron < currentWidth; neuron++) {
-                float blameSum = 0;
-                for (int nextNeuron = 0; nextNeuron < nextWidth; nextNeuron++) {
-                    int weight = (nextNeuron * currentWidth) + neuron;
-                    blameSum += nextLayerDeltas[nextNeuron] * connectingWeights[weight];
-                }
-                float layerOutput = hiddenLayerOutputs[layer][neuron];
-                layerDeltas[neuron] = blameSum * (layerOutput * (1.0f - layerOutput));
-            }
-        }
+    public void accumulateGradients(float[] test, float[] desiredOutputs) {
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
             float[] targetDeltas;
             float[] sourceOutputs;
@@ -131,26 +109,43 @@ public class FeedForwardNetwork implements Network, Neuron{
                 sourceWidth = hiddenLayerWidth;
             }
 
-            int weightIndex = 0;
 
-            // LINEAR MEMORY ACCESS: Target is outer loop, Source is inner loop
+            float[] currentWeightGradients = weightGradients[layer];
+            float[] currentBiasGradients = biasGradients[layer];
+            int weightIndex = 0;
+            //bias
             for (int targetNeuron = 0; targetNeuron < targetWidth; targetNeuron++) {
                 float targetDelta = targetDeltas[targetNeuron];
-
+                //weights
                 for (int sourceNeuron = 0; sourceNeuron < sourceWidth; sourceNeuron++) {
-                    float adjust = learningRate * targetDelta * sourceOutputs[sourceNeuron];
-                    currentWeights[weightIndex] -= adjust;
+                    float gradient = targetDelta * sourceOutputs[sourceNeuron];
+                    //accumulation
+                    currentWeightGradients[weightIndex] += gradient;
                     weightIndex++;
                 }
-
-                // Update the bias for the target neuron
-                currentBiases[targetNeuron] -= learningRate * targetDelta;
+                //accumulate bias
+                currentBiasGradients[targetNeuron] += targetDelta;
+            }
+        }
+    }
+    public void applyBatch(float learningRate, int batchSize) {
+        for (int layer = 0; layer < hiddenLayerDepth; layer++) {
+            float[] weights = hiddenLayerWeights[layer];
+            float[] weightGrads = weightGradients[layer];
+            for (int weight = 0; weight < weights.length; weight++) {
+                weights[weight] -= learningRate * (weightGrads[weight] / batchSize);
+                weightGrads[weight] = 0.0f;
+            }
+            float [] biases = hiddenLayerBias[layer];
+            float[] biasGrads = biasGradients[layer];
+            for (int bias = 0; bias < biases.length; bias++) {
+                biases[bias] -= learningRate * (biasGrads[bias] / batchSize); //same thing but for bias
             }
         }
     }
 
     @Override
-    public void train(float[][] input, float[][] desiredOutputs, int epochs, float learningRate) {
+    public void trainDataset(float[][] input, float[][] desiredOutputs, int epochs, int batchSize, float learningRate) {
         int numSamples = input.length;
 
         int[] indices = new int[numSamples];
@@ -159,17 +154,21 @@ public class FeedForwardNetwork implements Network, Neuron{
         }
 
         Random random = new Random();
-        for (int epoch = 0; epoch < epochs; epoch++) {
+        for (int epoch = 1; epoch <= epochs; epoch++) {
             for (int i = 0; i < numSamples; i++) {
-                int swap = random.nextInt(numSamples);
+                int swap = random.nextInt(numSamples); //prevents network from memorizing order
                 int temp = indices[i];
                 indices[i] = indices[swap];
                 indices[swap] = temp; //swap temp and swap (data is shuffled now)
             }
-            for (int i = 0; i < numSamples; i++) {
-                float[] currentInput = input[i];
-                float[] currentExpectedOutput = desiredOutputs[i];
-                trainLoop(currentInput, currentExpectedOutput, learningRate);
+            for (int i = 0; i < numSamples; i+=batchSize) {
+                int trueBatchSize = Math.min(batchSize, numSamples - i);
+
+                for (int j = 0; j < trueBatchSize; j++) {
+                    int sampleIndex= indices[i+j]; //train with these
+                    accumulateGradients(input[sampleIndex],  desiredOutputs[sampleIndex]);
+                }
+                applyBatch(learningRate, trueBatchSize);
             }
 
         }
