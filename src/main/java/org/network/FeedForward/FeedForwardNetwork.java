@@ -1,6 +1,8 @@
 package org.network.FeedForward;
 
 import org.network.neuron.Neuron;
+import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
+import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -32,11 +34,16 @@ public class FeedForwardNetwork implements Network, Neuron{
     public float[][] weightGradients;
     public float[][] biasGradients;
 
+    public FloatArray currentInput;
+    public FloatArray currentDesiredOutputs;
     public FeedForwardNetwork(int inputSize, int hiddenLayerWidth, int hiddenLayerDepth, int outputSize) {
         this.inputSize = inputSize;
         this.hiddenLayerWidth = hiddenLayerWidth;
         this.hiddenLayerDepth = hiddenLayerDepth;
         this.outputSize = outputSize;
+
+        this.currentInput = new FloatArray(inputSize);
+        this.currentDesiredOutputs = new FloatArray(outputSize);
 
         hiddenLayerWeights = new float[hiddenLayerDepth][];
 
@@ -79,7 +86,40 @@ public class FeedForwardNetwork implements Network, Neuron{
         biasGradients = new float[hiddenLayerDepth][hiddenLayerWidth];
     }
 
-    public void accumulateGradients(float[] test) {
+    public void accumulateGradients(float[] test, float[] desiredOutputs) {
+
+        float[] output = predict(test);
+
+        for (int i = 0; i < outputSize; i++) {
+            float neuronOutput = output[i];
+            outputLayerDeltas[i] = (neuronOutput - desiredOutputs[i]) * (1.0f - neuronOutput * neuronOutput);
+        }
+
+        for (int layer = hiddenLayerDepth - 2; layer >= 0; layer--) {
+            float[] currentDeltas = hiddenLayerDeltas[layer];
+            float[] nextLayerDeltas;
+            float[] connectingWeights = hiddenLayerWeights[layer + 1];
+            int nextWidth;
+
+            if (layer == hiddenLayerDepth - 2) {
+                nextLayerDeltas = outputLayerDeltas;
+                nextWidth = outputSize;
+            } else {
+                nextLayerDeltas = hiddenLayerDeltas[layer + 1];
+                nextWidth = hiddenLayerWidth;
+            }
+
+            int currentWidth = currentDeltas.length;
+            for (int neuron = 0; neuron < currentWidth; neuron++) {
+                float blameSum = 0.0f;
+                for (int nextNeuron = 0; nextNeuron < nextWidth; nextNeuron++) {
+                    int weightIdx = (nextNeuron * currentWidth) + neuron;
+                    blameSum += nextLayerDeltas[nextNeuron] * connectingWeights[weightIdx];
+                }
+                float layerOutput = hiddenLayerOutputs[layer][neuron];
+                currentDeltas[neuron] = blameSum * (layerOutput * (1.0f - layerOutput));
+            }
+        }
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
             float[] targetDeltas;
             float[] sourceOutputs;
@@ -136,6 +176,7 @@ public class FeedForwardNetwork implements Network, Neuron{
             float[] biasGrads = biasGradients[layer];
             for (int bias = 0; bias < biases.length; bias++) {
                 biases[bias] -= learningRate * (biasGrads[bias] / batchSize); //same thing but for bias
+                biasGrads[bias] = 0.0f;
             }
         }
     }
@@ -148,7 +189,6 @@ public class FeedForwardNetwork implements Network, Neuron{
         for (int i = 0; i < numSamples; i++) {
             indices[i] = i;
         }
-
         Random random = new Random();
         for (int epoch = 1; epoch <= epochs; epoch++) {
             for (int i = 0; i < numSamples; i++) {
@@ -159,10 +199,9 @@ public class FeedForwardNetwork implements Network, Neuron{
             }
             for (int i = 0; i < numSamples; i+=batchSize) {
                 int trueBatchSize = Math.min(batchSize, numSamples - i);
-
                 for (int j = 0; j < trueBatchSize; j++) {
                     int sampleIndex= indices[i+j]; //train with these
-                    accumulateGradients(input[sampleIndex]);
+                    accumulateGradients(input[sampleIndex], desiredOutputs[sampleIndex]);
                 }
                 applyBatch(learningRate, trueBatchSize);
             }
