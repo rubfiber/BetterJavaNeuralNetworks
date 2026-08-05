@@ -1,11 +1,12 @@
 package org.network.FeedForward;
 
 import org.network.neuron.Neuron;
-import uk.ac.manchester.tornado.api.TornadoExecutionPlan;
+import org.network.util;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
-import java.io.File;
+import java.io.*;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Random;
 
@@ -16,7 +17,7 @@ import java.util.Random;
 
 import static org.network.util.sigmoid;
 
-public class FeedForwardNetwork implements Network, Neuron{
+public class FeedForwardNetwork implements Network, Neuron {
     int inputSize;
     int hiddenLayerWidth;
     int hiddenLayerDepth;
@@ -36,6 +37,7 @@ public class FeedForwardNetwork implements Network, Neuron{
 
     public FloatArray currentInput;
     public FloatArray currentDesiredOutputs;
+
     public FeedForwardNetwork(int inputSize, int hiddenLayerWidth, int hiddenLayerDepth, int outputSize) {
         this.inputSize = inputSize;
         this.hiddenLayerWidth = hiddenLayerWidth;
@@ -70,7 +72,7 @@ public class FeedForwardNetwork implements Network, Neuron{
         hiddenLayerOutputs[hiddenLayerDepth - 1] = new float[outputSize];
 
         hiddenLayerDeltas = new float[hiddenLayerDepth][];
-        for  (int i = 0; i < hiddenLayerDepth-1; i++) {
+        for (int i = 0; i < hiddenLayerDepth - 1; i++) {
             hiddenLayerDeltas[i] = new float[hiddenLayerWidth];
         }
         hiddenLayerDeltas[hiddenLayerDepth - 1] = new float[outputSize];
@@ -164,6 +166,7 @@ public class FeedForwardNetwork implements Network, Neuron{
             }
         }
     }
+
     public void applyBatch(float learningRate, int batchSize) {
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
             float[] weights = hiddenLayerWeights[layer];
@@ -172,7 +175,7 @@ public class FeedForwardNetwork implements Network, Neuron{
                 weights[weight] -= learningRate * (weightGrads[weight] / batchSize);
                 weightGrads[weight] = 0.0f;
             }
-            float [] biases = hiddenLayerBias[layer];
+            float[] biases = hiddenLayerBias[layer];
             float[] biasGrads = biasGradients[layer];
             for (int bias = 0; bias < biases.length; bias++) {
                 biases[bias] -= learningRate * (biasGrads[bias] / batchSize); //same thing but for bias
@@ -197,10 +200,10 @@ public class FeedForwardNetwork implements Network, Neuron{
                 indices[i] = indices[swap];
                 indices[swap] = temp; //swap temp and swap (data is shuffled now)
             }
-            for (int i = 0; i < numSamples; i+=batchSize) {
+            for (int i = 0; i < numSamples; i += batchSize) {
                 int trueBatchSize = Math.min(batchSize, numSamples - i);
                 for (int j = 0; j < trueBatchSize; j++) {
-                    int sampleIndex= indices[i+j]; //train with these
+                    int sampleIndex = indices[i + j]; //train with these
                     accumulateGradients(input[sampleIndex], desiredOutputs[sampleIndex]);
                 }
                 applyBatch(learningRate, trueBatchSize);
@@ -216,7 +219,7 @@ public class FeedForwardNetwork implements Network, Neuron{
         //first layer
         float[] firstLayerWeights = hiddenLayerWeights[0];
         float[] firstLayerBias = hiddenLayerBias[0];
-        float[] firstLayerOutputs =  hiddenLayerOutputs[0];
+        float[] firstLayerOutputs = hiddenLayerOutputs[0];
         int weightIndex = 0;
         for (int neuron = 0; neuron < hiddenLayerWidth; neuron++) {
             float sum = 0.0f;
@@ -235,11 +238,11 @@ public class FeedForwardNetwork implements Network, Neuron{
             }
         }
         // hidden layers
-        for (int layer = 1; layer < hiddenLayerDepth-1; layer++) {
+        for (int layer = 1; layer < hiddenLayerDepth - 1; layer++) {
             float[] layerWeights = hiddenLayerWeights[layer];
-            float[]  layerBias = hiddenLayerBias[layer];
-            float[] layerOutputs =  hiddenLayerOutputs[layer];
-            float[] layerInput = hiddenLayerOutputs[layer-1];
+            float[] layerBias = hiddenLayerBias[layer];
+            float[] layerOutputs = hiddenLayerOutputs[layer];
+            float[] layerInput = hiddenLayerOutputs[layer - 1];
             int middleWeightIndex = 0;
             for (int neuron = 0; neuron < hiddenLayerWidth; neuron++) {
                 float sum = 0.0f;
@@ -276,18 +279,116 @@ public class FeedForwardNetwork implements Network, Neuron{
     }
 
 
-    @Override
-    public void loadState(File file) {
+    public void loadWeights(String hiddenWeightFilePath, String outputWeightFilePath) throws IOException {
+        Path weightsPath = Paths.get(hiddenWeightFilePath);
+        Path outputWeightPath = Paths.get(outputWeightFilePath);
+        int[] hiddenWeightsKey = new int[hiddenLayerDepth];
 
+        hiddenWeightsKey[0] = inputSize * hiddenLayerWidth;
+
+        for (int i = 1; i < hiddenLayerDepth; i++) {
+            hiddenWeightsKey[i] = hiddenLayerWidth * hiddenLayerWidth;
+        }
+        hiddenWeightsKey[hiddenLayerDepth - 1] = hiddenLayerWidth * outputSize;
+
+        float[][] weights;
+
+        float[] outputWeights;
+        float[][] loadedHiddenWeights;
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(weightsPath.toFile())))) {
+
+            int length = dis.readInt();
+            System.out.println("Attempting to load hidden bias array of size: " + length);
+            float[] weightData = new float[length];
+
+            for (int i = 0; i < length; i++) {
+                weightData[i] = dis.readFloat();
+            }
+
+            loadedHiddenWeights = util.deflatten(weightData, hiddenWeightsKey);
+        }
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(outputWeightPath.toFile())))) {
+
+            int length = dis.readInt();
+
+            outputWeights = new float[length];
+
+            for (int i = 0; i < length; i++) {
+                outputWeights[i] = dis.readFloat();
+            }
+        }
+        this.hiddenLayerWeights = loadedHiddenWeights;
+        this.outputLayerWeights = outputWeights;
+    }
+    public void loadBias(String hiddenBiasFilePath, String outputBiasFilePath) throws IOException {
+        Path biasPath = Paths.get(hiddenBiasFilePath);
+        Path outputBiasPath = Paths.get(outputBiasFilePath);
+        int[] hiddenKey = new int[hiddenLayerDepth];
+        Arrays.fill(hiddenKey, hiddenLayerWidth); //shows util.deflatten how to de-flatten the array
+        float[][] hiddenBias;
+        float[] outputBias;
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(biasPath.toFile())))) {
+
+            int length = dis.readInt();
+            float[] biasData = new float[length];
+
+            for (int i = 0; i < length; i++) {
+                biasData[i] = dis.readFloat();
+            }
+            hiddenBias = util.deflatten(biasData, hiddenKey);
+
+        }
+        try (DataInputStream dis = new DataInputStream(
+                new BufferedInputStream(new FileInputStream(outputBiasPath.toFile())))) {
+
+            int length = dis.readInt();
+
+            outputBias = new float[length];
+
+            for (int i = 0; i < length; i++) {
+                outputBias[i] = dis.readFloat();
+            }
+        }
+        this.hiddenLayerBias = hiddenBias;
+        this.outputLayerBias = outputBias;
+    }
+
+    public static void saveState(float[][] hiddenWeights, float[][] hiddenBias, float[] outputWeights, float[] outputBias, String weightFilePath, String biasFilePath, String outputWeightFilePath, String outputBiasFilePath) {
+        float[] flattenedWeights = util.flatten(hiddenWeights);
+        float[] flattenedBias = util.flatten(hiddenBias);
+        writeWeightsAndBias(weightFilePath, biasFilePath, flattenedWeights, flattenedBias);
+        writeWeightsAndBias(outputWeightFilePath, outputBiasFilePath, outputWeights, outputBias);
+    }
+
+    private static void writeWeightsAndBias(String weightFilePath, String biasFilePath, float[] flattenedWeights, float[] flattenedBias) {
+        Path weightsPath = Paths.get(weightFilePath);
+        Path biasPath = Paths.get(biasFilePath);
+        try (DataOutputStream dos = new DataOutputStream(
+                new BufferedOutputStream(new FileOutputStream(weightsPath.toFile())))) {
+
+            dos.writeInt(flattenedWeights.length);
+            for (float value : flattenedWeights) {
+                dos.writeFloat(value);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        try (DataOutputStream dos = new DataOutputStream(
+                new BufferedOutputStream(new FileOutputStream(biasPath.toFile())))) {
+
+            dos.writeInt(flattenedBias.length);
+            for (float value : flattenedBias) {
+                dos.writeFloat(value);
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
-    public void saveState(Path path) {
-
-    }
-//Neuron functions
-    @Override
-
     public void initializeHiddenLayers() {
         final Random random = new Random();
         Arrays.fill(hiddenLayerBias[0], 0);
@@ -332,26 +433,4 @@ public class FeedForwardNetwork implements Network, Neuron{
             outputLayerWeights[i] =  random.nextFloat(-outputLayerLimit, outputLayerLimit);
         }
     }
-
-    @Override
-    public float getWeights(int neuronIdx) {
-        return 0;
-    }
-
-    @Override
-    public float getBias(int neuronIdx) {
-        return 0;
-    }
-
-    @Override
-    public void setWeights(int neuronIdx, float value) {
-
-    }
-
-    @Override
-    public void setBias(int neuronIdx, float value) {
-
-    }
-
-
 }

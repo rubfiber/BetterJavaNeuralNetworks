@@ -10,7 +10,6 @@ public interface Network {
     static float[] acceleratedPrediction(float[] input) {
         return input;
     }
-     void loadState(File file);
-     void saveState(Path path);
+
 
 }
