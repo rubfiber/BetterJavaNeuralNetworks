@@ -31,29 +31,44 @@ public class util {
 
         return flatArray;
     }
-    public static float[][] deflatten(float[] matrix, int[] key) {
-        if (matrix == null || key == null) {
-            return new float[0][0];
-        }
-        assert Arrays.stream(key).sum() == matrix.length : "Key sum must equal matrix length";
+    public static float[][] deflattenWeights(float[] flatArray, int[] layers) {
+        if (flatArray == null || layers == null) return new float[0][0];
 
-        float[][] output = new float[key.length][];
+        int depth = layers.length - 1;
+        float[][] output = new float[depth][];
         int startingIdx = 0;
 
-        for (int row = 0; row < key.length; row++) {
-            int rowLength = key[row];
-            output[row] = new float[rowLength];
+        for (int i = 0; i < depth; i++) {
+            int rowLength = layers[i] * layers[i + 1];
+            output[i] = new float[rowLength];
 
-            for (int col = 0; col < rowLength; col++) {
-                output[row][col] = matrix[startingIdx + col];
-                System.out.println(Arrays.deepToString(output));
+            for (int j = 0; j < rowLength; j++) {
+                output[i][j] = flatArray[startingIdx + j];
             }
-
             startingIdx += rowLength;
         }
-
         return output;
     }
+
+    public static float[][] deflattenBias(float[] flatArray, int[] layers) {
+        if (flatArray == null || layers == null) return new float[0][0];
+
+        int depth = layers.length - 1;
+        float[][] output = new float[depth][];
+        int startingIdx = 0;
+
+        for (int i = 0; i < depth; i++) {
+            int rowLength = layers[i + 1];
+            output[i] = new float[rowLength];
+
+            for (int j = 0; j < rowLength; j++) {
+                output[i][j] = flatArray[startingIdx + j];
+            }
+            startingIdx += rowLength;
+        }
+        return output;
+    }
+
     public static float sigmoid(float x) {
         if (x >= 0) {
             float z = (float) Math.exp(-x);
