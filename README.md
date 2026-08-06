@@ -26,21 +26,15 @@ Using the ```network.trainDataset(trainDataset(float[][] input, float[][] desire
 - learningRate is how much the neurons respond to changes. You can also fine tune this value.
 ### Saving to a file
 The network allows you to save its state to a file, holding the weights and biases. \
-First, you need to create a file called ```hiddenWeights.bin```, ```hiddenBias.bin```, ```outputWeights.bin```, and ```outputBias.bin```.\
-Use the ```saveState(float[][] hiddenWeights, float[][] hiddenBias, float[] outputWeights, float[] outputBias, String weightFilePath, String biasFilePath, String outputWeightFilePath, String outputBiasFilePath)```, where:
-- hiddenWeights is the hidden layer weight array you want to save, using network.hiddenLayerWeights.
-- hiddenBias is the hidden layer bias array you want to save, using network.hiddenLayerBias.
-- outputWeights is the output weight array you want to save, using network.outputLayerWeights.
-- outputBias is the output layer bias array you want to save, using network.outputLayerBias.
-- The Strings are their respective paths, e.g. ```/home/user/network/hiddenWeights.bin```.
+First, you need to create 2 ```.bin``` files, named whatever you want - one for  weights and one for bias, e.g. ```weights.bin``` and ```bias.bin```, \
+Use the ```saveState(String weightFilePath, String biasFilePath)```, where:
+- weightFilePath is the path to the weights file (as a ```.bin``` file), e.g. ```/home/user/network/weights.bin```.
+- biasFilePath is the path to the bias file (as a ```.bin``` file), e.g. ```/home/user/network/bias.bin```.
 ### Loading a network state
 There are 2 methods to load the network state, one for loading weights and the other for loading bias. \
-The one for loading weights is ```network.loadWeights(String hiddenWeightFilePath, String outputWeightFilePath)```, where:
-- hiddenWeightFilePath is the path of the hidden weights file, which is saved as a ```.bin``` file.
-- outputWeightFilePath is the path of the output layer weights file, which is saved  as a ```.bin``` file. 
+The one for loading weights is ```loadWeights(String weightFilePath)```, where:
+- weightFilePath is the path of the weights file, which is saved as a ```.bin``` file.
 
 
-
-The one for loading biases is ```network.loadBias(String hiddenBiasFilePath, String outputBiasFilePath)```, where:
-- hiddenBiasFilePath is the path of the hidden bias file, which is saved as a ```.bin``` file.
-- outputBiasFilePath is the path of the output layer bias file, which is saved  as a ```.bin``` file.
+The one for loading biases is ```network.loadBias(String BiasFilePath)```, where:
+- BiasFilePath is the path of the bias file, which is saved as a ```.bin``` file.
