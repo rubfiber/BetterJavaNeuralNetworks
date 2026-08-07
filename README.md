@@ -18,9 +18,8 @@ Format the constructor like this: ```FeedForwardNetwork network = new FeedForwar
 ### Predictions
 Use the ```network.predict(float[] input) ```function, where the input is what is being inputted into the network.\
 ### Training
-Using the ```network.trainDataset(trainDataset(float[][] input, float[][] desiredOutputs, int epochs, int batchSize, float learningRate)```, you can train the network, where:
-- input is the list of all inputs from the dataset (each element is its own array of floats)
-- desiredOutputs is the outputs that you want to see come out of the network, where each corresponds to one input.
+Using the ```network.trainDataset(trainDataset(Dataset dataset, int epochs, int batchSize, float learningRate)```, you can train the network, where:
+- dataset is the dataset that the network is trained on. Includes the input data and output data, both in the format float[][], where the first value is the train index and the second array is for what should be inputted
 - epochs is the number of training loops that the network goes through. Too little results in underfitting, where the model has not learned enough, but too much causes overfitting, causing the network to become too used to the training data
 - batchSize is the size of the batches, since we are using mini-batch gradient descent. You can always fine-tune it
 - learningRate is how much the neurons respond to changes. You can also fine tune this value.
