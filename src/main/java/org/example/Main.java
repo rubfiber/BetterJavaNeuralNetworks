@@ -1,5 +1,6 @@
 package org.example;
 
+import org.network.Dataset;
 import org.network.FeedForward.FeedForwardNetwork;
 
 import java.io.IOException;
@@ -33,7 +34,7 @@ public class Main {
         }
 
         long startTime = System.nanoTime();
-        network.trainDataset(trainingData, targetData, 100000, 1, 0.01f);
+        network.trainDataset(new Dataset(trainingData, targetData), 100000, 1, 0.01f);
         long endTime = System.nanoTime();
         network.saveState("src/main/java/org/example/exampleWeights.bin", "src/main/java/org/example/exampleBias.bin");
         long durationNs = endTime - startTime;
