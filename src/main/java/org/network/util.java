@@ -3,6 +3,7 @@ package org.network;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
 import java.util.Arrays;
+import java.util.List;
 
 public class util {
     public static float getElementFromFloatArray (FloatArray array, int[] indices, int numColumns) {
@@ -77,6 +78,21 @@ public class util {
             float z = (float) Math.exp(x);
             return z / (1 + z);
         }
+    }
+    public static float[][] toPrimativeFloatArray(List<List<Float>> list) {
+        if (list == null) return null;
+
+        float[][] array = new float[list.size()][];
+        for (int i = 0; i < list.size(); i++) {
+            List<Float> innerList = list.get(i);
+            array[i] = new float[innerList.size()];
+            for (int j = 0; j < innerList.size(); j++) {
+                // Safe unboxing; handles null checking if necessary
+                Float value = innerList.get(j);
+                array[i][j] = (value != null) ? value : 0.0f;
+            }
+        }
+        return array;
     }
 
 }
