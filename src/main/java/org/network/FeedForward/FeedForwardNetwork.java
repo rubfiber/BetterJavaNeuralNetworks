@@ -1,9 +1,11 @@
 package org.network.FeedForward;
 
+import org.network.Dataset;
 import org.network.neuron.Neuron;
 import org.network.util;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
+import javax.xml.crypto.Data;
 import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -38,7 +40,7 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      *
-     * @param layers this is how the layers will be formatted for your net - you can adjust the number of hidden layers by adding more elements between the first and the last and the neurons per layer by increasing the number of the layer you want to change
+     * @param layers This is how the layers will be formatted for your net - you can adjust the number of hidden layers by adding more elements between the first and the last and the neurons per layer by increasing the number of the layer you want to change
      */
     public FeedForwardNetwork(int[] layers) {
         this.layers = layers;
@@ -75,8 +77,8 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      *
-     * @param test - test values for accumulating gradients, which are how sensitive the network is to changes in the weights and balances of the network
-     * @param desiredOutputs - the target outputs, which is what you expect the network to return
+     * @param test Test values for accumulating gradients, which are how sensitive the network is to changes in the weights and balances of the network
+     * @param desiredOutputs The target outputs, which is what you expect the network to return
      */
     public void accumulateGradients(float[] test, float[] desiredOutputs) {
 
@@ -134,8 +136,8 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      *
-     * @param learningRate - How quickly the network should train - too high, and it might overshoot but too low, and it might not adjust as much - you can tune this to whatever you like
-     * @param batchSize - How big the batches are - higher time speeds up the time it takes to process during each epoch, but results in a loss in how well the network can generalize new data, outside the training datasets - however, shrinking it uses less memory and adds noise that the network uses to be able to generalize data better on data it hasn't seen, but also has a higher time per epoch
+     * @param learningRate How quickly the network should train - too high, and it might overshoot but too low, and it might not adjust as much - you can tune this to whatever you like
+     * @param batchSize How big the batches are - higher time speeds up the time it takes to process during each epoch, but results in a loss in how well the network can generalize new data, outside the training datasets - however, shrinking it uses less memory and adds noise that the network uses to be able to generalize data better on data it hasn't seen, but also has a higher time per epoch
      */
     public void applyBatch(float learningRate, int batchSize) {
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
@@ -156,14 +158,15 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      *
-     * @param input - the inputs for the dataset - should match with the corresponding output in desiredOutouts[][]
-     * @param desiredOutputs - the outputs for the dataset - should match with the correspind input in input[][]
-     * @param epochs - the number of epochs, or training loops, the network goes through - lower number reduces the time it takes to train the network, but causes underfitting. This is where the network fails to learn the rules of the data and causes low accuracy. However, more epochs has a higher training accuracy, but causes overfitting, where the model memorizes the exact details of the training data and becomes too used to it
-     * @param batchSize - How big the batches are - higher time speeds up the time it takes to process during each epoch, but results in a loss in how well the network can generalize new data, outside the training datasets - however, shrinking it uses less memory and adds noise that the network uses to be able to generalize data better on data it hasn't seen, but also has a higher time per epoch
-     * @param learningRate - How quickly the network should train - too high, and it might overshoot but too low, and it might not adjust as much - you can tune this to whatever you like
+    * @param dataset The dataset that the network is trained on. Includes the input data and output data, both in the format float[][], where the first value is the train index and the second array is for what should be inputted
+     * @param epochs The number of epochs, or training loops, the network goes through - lower number reduces the time it takes to train the network, but causes underfitting. This is where the network fails to learn the rules of the data and causes low accuracy. However, more epochs has a higher training accuracy, but causes overfitting, where the model memorizes the exact details of the training data and becomes too used to it
+     * @param batchSize How big the batches are - higher time speeds up the time it takes to process during each epoch, but results in a loss in how well the network can generalize new data, outside the training datasets - however, shrinking it uses less memory and adds noise that the network uses to be able to generalize data better on data it hasn't seen, but also has a higher time per epoch
+     * @param learningRate How quickly the network should train - too high, and it might overshoot but too low, and it might not adjust as much - you can tune this to whatever you like
      */
     @Override
-    public void trainDataset(float[][] input, float[][] desiredOutputs, int epochs, int batchSize, float learningRate) {
+    public void trainDataset(Dataset dataset, int epochs, int batchSize, float learningRate) {
+        float[][] input = dataset.getInputData();
+        float[][] desiredOutputs = dataset.getOutputData();
         int numSamples = input.length;
 
         int[] indices = new int[numSamples];
@@ -192,8 +195,8 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      * The model makes a prediction based on an input, using math to calculate its output from the weights and biases
-     * @param input - the data you want the model to make a prediction from
-     * @return the prediction based on the weights and biases provided
+     * @param input The data you want the model to make a prediction from
+     * @return The prediction based on the weights and biases provided
      */
     @Override
     public float[] predict(float[] input) {
@@ -234,15 +237,14 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      * Loads the weights from a .bin file
-     * @param weightFilePath - the file path leading to the weights you want to store - you can also use relative paths ( /src/...)
-     * @throws IOException if there was an error loading the weights
+     * @param weightFilePath - The file path leading to the weights you want to store - you can also use relative paths ( /src/...)
+     * @throws IOException If there was an error loading the weights
      */
     public void loadWeights(String weightFilePath) throws IOException {
         Path weightsPath = Paths.get(weightFilePath);
 
         try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(weightsPath.toFile())))) {
             int length = dis.readInt();
-            System.out.println("Attempting to load weight array of size: " + length);
 
             float[] weightData = new float[length];
             for (int i = 0; i < length; i++) {
@@ -255,8 +257,8 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      * Loads the biases from a .bin file
-     * @param biasFilePath - the file path leading to the biases you want to store - you can also use relative paths ( /src/...)
-     * @throws IOException if there was an error loading the biases
+     * @param biasFilePath - The file path leading to the biases you want to store - you can also use relative paths ( /src/...)
+     * @throws IOException If there was an error loading the biases
      */
 
     public void loadBias(String biasFilePath) throws IOException {
@@ -264,7 +266,6 @@ public class FeedForwardNetwork implements Network, Neuron {
 
         try (DataInputStream dis = new DataInputStream(new BufferedInputStream(new FileInputStream(biasPath.toFile())))) {
             int length = dis.readInt();
-            System.out.println("Attempting to load bias array of size: " + length);
 
             float[] biasData = new float[length];
             for (int i = 0; i < length; i++) {
@@ -277,8 +278,8 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      * Saves the state of the network to a .bin file
-     * @param weightFilePath - the file path leading to the biases you want to store - you can also use relative paths ( /src/...)
-     * @param biasFilePath
+     * @param weightFilePath The file path leading to the weights you want to store - you can also use relative paths ( /src/...)
+     * @param biasFilePath The file path leading to the biases you want to store - you can also use relative paths ( /src/...)
      */
     public void saveState(String weightFilePath, String biasFilePath) {
         float[] flattenedWeights = util.flatten(this.hiddenLayerWeights);
@@ -289,10 +290,10 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      * Write weights and biases to a .bin file
-     * @param weightFilePath - the file path leading to the weights you want to store - you can also use relative paths ( /src/...)
-     * @param biasFilePath - - the file path leading to the biases you want to store - you can also use relative paths ( /src/...)
-     * @param flattenedWeights - the weights tou want to store (flattened)
-     * @param flattenedBias - the weights you want to store (flattened)
+     * @param weightFilePath The file path leading to the weights you want to store - you can also use relative paths ( /src/...)
+     * @param biasFilePath The file path leading to the biases you want to store - you can also use relative paths ( /src/...)
+     * @param flattenedWeights The weights tou want to store (flattened)
+     * @param flattenedBias The weights you want to store (flattened)
      */
     private static void writeWeightsAndBias(String weightFilePath, String biasFilePath, float[] flattenedWeights, float[] flattenedBias) {
         Path weightsPath = Paths.get(weightFilePath);
@@ -300,7 +301,6 @@ public class FeedForwardNetwork implements Network, Neuron {
         try (DataOutputStream dos = new DataOutputStream(
                 new BufferedOutputStream(new FileOutputStream(weightsPath.toFile())))) {
 
-            System.out.println("Flat " + (flattenedWeights.length));
             dos.writeInt(flattenedWeights.length);
             for (float value : flattenedWeights) {
                 dos.writeFloat(value);
