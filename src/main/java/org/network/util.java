@@ -2,7 +2,6 @@ package org.network;
 
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
-import java.util.Arrays;
 import java.util.List;
 
 public class util {
@@ -43,9 +42,7 @@ public class util {
             int rowLength = layers[i] * layers[i + 1];
             output[i] = new float[rowLength];
 
-            for (int j = 0; j < rowLength; j++) {
-                output[i][j] = flatArray[startingIdx + j];
-            }
+            System.arraycopy(flatArray, startingIdx, output[i], 0, rowLength);
             startingIdx += rowLength;
         }
         return output;
@@ -62,9 +59,7 @@ public class util {
             int rowLength = layers[i + 1];
             output[i] = new float[rowLength];
 
-            for (int j = 0; j < rowLength; j++) {
-                output[i][j] = flatArray[startingIdx + j];
-            }
+            System.arraycopy(flatArray, startingIdx, output[i], 0, rowLength);
             startingIdx += rowLength;
         }
         return output;

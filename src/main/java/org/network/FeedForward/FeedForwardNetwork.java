@@ -5,7 +5,6 @@ import org.network.neuron.Neuron;
 import org.network.util;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
-import javax.xml.crypto.Data;
 import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,7 +25,6 @@ public class FeedForwardNetwork implements Network, Neuron {
     float[][] hiddenLayerOutputs;
 
     float[][] hiddenLayerDeltas;
-    float[] outputLayerDeltas;
 
     public float[][] weightGradients;
     public float[][] biasGradients;
@@ -77,12 +75,10 @@ public class FeedForwardNetwork implements Network, Neuron {
 
     /**
      *
-     * @param test Test values for accumulating gradients, which are how sensitive the network is to changes in the weights and balances of the network
      * @param desiredOutputs The target outputs, which is what you expect the network to return
      */
-    public void accumulateGradients(float[] test, float[] desiredOutputs) {
+    public void accumulateGradients(float[] desiredOutputs) {
 
-        float[] output = predict(test);
 
         int lastLayerIdx = hiddenLayerDepth - 1;
         float[] finalOutputs = hiddenLayerOutputs[lastLayerIdx];
@@ -112,22 +108,15 @@ public class FeedForwardNetwork implements Network, Neuron {
         }
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
             float[] targetDeltas = hiddenLayerDeltas[layer];
-            float[] sourceOutputs = (layer == 0) ? test : hiddenLayerOutputs[layer - 1];
 
             int targetWidth = layers[layer + 1];
-            int sourceWidth = layers[layer];
 
 
-            float[] currentWeightGradients = weightGradients[layer];
             float[] currentBiasGradients = biasGradients[layer];
-            int weightIndex = 0;
             //bias
             for (int targetNeuron = 0; targetNeuron < targetWidth; targetNeuron++) {
                 float targetDelta = targetDeltas[targetNeuron];
                 //weights
-                for (int sourceNeuron = 0; sourceNeuron < sourceWidth; sourceNeuron++) {
-                    float gradient = currentWeightGradients[weightIndex++] += targetDelta * sourceOutputs[sourceNeuron];
-                }
                 //accumulate bias
                 currentBiasGradients[targetNeuron] += targetDelta;
             }
@@ -185,7 +174,7 @@ public class FeedForwardNetwork implements Network, Neuron {
                 int trueBatchSize = Math.min(batchSize, numSamples - i);
                 for (int j = 0; j < trueBatchSize; j++) {
                     int sampleIndex = indices[i + j]; //train with these
-                    accumulateGradients(input[sampleIndex], desiredOutputs[sampleIndex]);
+                    accumulateGradients(desiredOutputs[sampleIndex]);
                 }
                 applyBatch(learningRate, trueBatchSize);
             }

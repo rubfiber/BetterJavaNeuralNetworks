@@ -7,8 +7,8 @@ import java.util.stream.IntStream;
 
 public class Dataset {
 
-    List<List<Float>> inputData = new ArrayList<>();
-    List<List<Float>> outputData = new ArrayList<>();
+    List<List<Float>> inputData;
+    List<List<Float>> outputData;
 
     public Dataset(float[][] initialInput, float[][] initialOutput) {
         inputData = Arrays.stream(initialInput)
