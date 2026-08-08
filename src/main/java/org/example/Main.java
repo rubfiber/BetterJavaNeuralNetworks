@@ -1,6 +1,7 @@
 package org.example;
 
 import org.network.Dataset;
+import org.network.FeedForward.Activation;
 import org.network.FeedForward.FeedForwardNetwork;
 
 import java.io.IOException;
@@ -10,21 +11,22 @@ import java.util.Arrays;
 public class Main {
     public static void main(String[] args) throws IOException {
         FeedForwardNetwork network = new FeedForwardNetwork(new int[]{2, 3, 4, 1});
+        network.setOutputActivation(Activation.RELU);
 
         // XOR
         float[][] trainingData = {
-                {0.0f, 0.0f},
-                {0.0f, 1.0f},
                 {1.0f, 0.0f},
-                {1.0f, 1.0f}
+                {0.0f, 0.0f},
+                {1.0f, 1.0f},
+                {0.0f, 1.0f}
         };
 
         //-1 false, 1 true
         float[][] targetData = {
-                {-1.0f},
                 { 1.0f},
-                { 1.0f},
-                {-1.0f}
+                { 0.0f},
+                { 0.0f},
+                { 1.0f}
         };
         System.out.println("XOR based on inputs:" +  Arrays.deepToString(trainingData));
         System.out.println("Predictions before training:");

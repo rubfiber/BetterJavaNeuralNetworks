@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Random;
 
 import static org.network.util.sigmoid;
+import static org.network.util.softmax;
 
 public class FeedForwardNetwork implements Network, Neuron {
     int inputSize;
@@ -33,8 +34,11 @@ public class FeedForwardNetwork implements Network, Neuron {
     public FloatArray currentDesiredOutputs;
 
     public int totalNetworkLength;
-
     int[] layers;
+
+    Activation outputActivation =  Activation.SIGMOID;
+    Activation hiddenActivation = Activation.TANH;
+
 
     /**
      *
@@ -77,20 +81,31 @@ public class FeedForwardNetwork implements Network, Neuron {
      *
      * @param desiredOutputs The target outputs, which is what you expect the network to return
      */
-    public void accumulateGradients(float[] desiredOutputs) {
-
+    public void accumulateGradients(float[] input, float[] desiredOutputs) {
+        predict(input);
 
         int lastLayerIdx = hiddenLayerDepth - 1;
         float[] finalOutputs = hiddenLayerOutputs[lastLayerIdx];
         float[] finalDeltas = hiddenLayerDeltas[lastLayerIdx];
 
         for (int i = 0; i < outputSize; i++) {
-            finalDeltas[i] = (finalOutputs[i] - desiredOutputs[i]) * (1.0f - finalOutputs[i] * finalOutputs[i]);
+            float out = finalOutputs[i];
+            float error = out - desiredOutputs[i];
+            float derivative = 1.0f;
+
+            if (outputActivation == Activation.SIGMOID) {
+                derivative = out * (1.0f - out);
+            } else if (outputActivation == Activation.TANH) {
+                derivative = 1.0f - (out * out);
+            }
+
+            finalDeltas[i] = error * derivative;
         }
 
+
         for (int layer = hiddenLayerDepth - 2; layer >= 0; layer--) {
-            int currentWidth = layers[layer+1];
-            int nextWidth = layers[layer+2];
+            int currentWidth = layers[layer + 1];
+            int nextWidth = layers[layer + 2];
 
             float[] currentDeltas = hiddenLayerDeltas[layer];
             float[] nextDeltas = hiddenLayerDeltas[layer + 1];
@@ -102,22 +117,40 @@ public class FeedForwardNetwork implements Network, Neuron {
                     int weightIdx = (nextNeuron * currentWidth) + neuron;
                     blameSum += nextDeltas[nextNeuron] * connectingWeights[weightIdx];
                 }
-                float layerOutput = hiddenLayerOutputs[layer][neuron];
-                currentDeltas[neuron] = blameSum * (layerOutput * (1.0f - layerOutput));
+                float out = hiddenLayerOutputs[layer][neuron];
+                float derivative = 1.0f;
+
+                if (hiddenActivation == Activation.SIGMOID) {
+                    derivative = out * (1.0f - out);
+                } else if (hiddenActivation == Activation.TANH) {
+                    derivative = 1.0f - (out * out);
+                } else if (hiddenActivation == Activation.RELU) {
+                    derivative = out > 0 ? 1.0f : 0.0f;
+                } else if (hiddenActivation == Activation.LEAKY_RELU) {
+                    derivative = out > 0 ? 1.0f : 0.01f;
+                }
+
+                currentDeltas[neuron] = blameSum * derivative;
             }
         }
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
             float[] targetDeltas = hiddenLayerDeltas[layer];
 
             int targetWidth = layers[layer + 1];
+            int sourceWidth = layers[layer];
 
+            float[] sourceOutputs = (layer == 0) ? input : hiddenLayerOutputs[layer - 1];
 
+            float[] currentWeightGradients = weightGradients[layer];
             float[] currentBiasGradients = biasGradients[layer];
+            int weightIndex = 0;
+
             //bias
             for (int targetNeuron = 0; targetNeuron < targetWidth; targetNeuron++) {
                 float targetDelta = targetDeltas[targetNeuron];
-                //weights
-                //accumulate bias
+                for (int sourceNeuron = 0; sourceNeuron < sourceWidth; sourceNeuron++) {
+                    currentWeightGradients[weightIndex++] += targetDelta * sourceOutputs[sourceNeuron];
+                }
                 currentBiasGradients[targetNeuron] += targetDelta;
             }
         }
@@ -174,14 +207,19 @@ public class FeedForwardNetwork implements Network, Neuron {
                 int trueBatchSize = Math.min(batchSize, numSamples - i);
                 for (int j = 0; j < trueBatchSize; j++) {
                     int sampleIndex = indices[i + j]; //train with these
-                    accumulateGradients(desiredOutputs[sampleIndex]);
+                    accumulateGradients(input[sampleIndex], desiredOutputs[sampleIndex]);
                 }
                 applyBatch(learningRate, trueBatchSize);
             }
 
         }
     }
-
+    public void setOutputActivation(Activation activation) {
+        outputActivation = activation;
+    }
+    public void setHiddenActivations(Activation activation) {
+        hiddenActivation = activation;
+    }
     /**
      * The model makes a prediction based on an input, using math to calculate its output from the weights and biases
      * @param input The data you want the model to make a prediction from
@@ -212,16 +250,33 @@ public class FeedForwardNetwork implements Network, Neuron {
                 }
                 sum += bias[outNeuron];
                 if (layer == hiddenLayerDepth - 1) {
-                    outputs[outNeuron] = (float) Math.tanh(sum);
+
+                    if (outputActivation == Activation.SOFTMAX || outputActivation == Activation.LINEAR) {
+                        outputs[outNeuron] = sum; // Softmax and Linear need the raw sum!
+                    } else if (outputActivation == Activation.SIGMOID) {
+                        outputs[outNeuron] = util.sigmoid(sum);
+                    } else if (outputActivation == Activation.TANH) {
+                        outputs[outNeuron] = (float) Math.tanh(sum); // Fixed Math.tanh!
+                    } else {
+                        outputs[outNeuron] = sum; // Safe fallback
+                    }
                 } else {
-                    outputs[outNeuron] = sigmoid(sum);
+
+                    if (hiddenActivation == Activation.RELU) {
+                        outputs[outNeuron] = util.relu(sum);
+                    } else if (hiddenActivation == Activation.LEAKY_RELU) {
+                        outputs[outNeuron] = util.leakyRelu(sum);
+                    } else if (hiddenActivation == Activation.TANH) {
+                        outputs[outNeuron] = (float) Math.tanh(sum);
+                    } else {
+                        outputs[outNeuron] = util.sigmoid(sum);
+                    }
                 }
             }
 
             currentInput = outputs;
         }
-
-        return hiddenLayerOutputs[hiddenLayerDepth - 1];
+        return (outputActivation == Activation.SOFTMAX) ? softmax(hiddenLayerOutputs[hiddenLayerDepth - 1]) : hiddenLayerOutputs[hiddenLayerDepth - 1];
     }
 
     /**
