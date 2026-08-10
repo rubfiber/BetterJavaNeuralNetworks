@@ -117,18 +117,7 @@ public class FeedForwardNetwork implements Network, Neuron {
                     int weightIdx = (nextNeuron * currentWidth) + neuron;
                     blameSum += nextDeltas[nextNeuron] * connectingWeights[weightIdx];
                 }
-                float out = hiddenLayerOutputs[layer][neuron];
-                float derivative = 1.0f;
-
-                if (hiddenActivation == Activation.SIGMOID) {
-                    derivative = out * (1.0f - out);
-                } else if (hiddenActivation == Activation.TANH) {
-                    derivative = 1.0f - (out * out);
-                } else if (hiddenActivation == Activation.RELU) {
-                    derivative = out > 0 ? 1.0f : 0.0f;
-                } else if (hiddenActivation == Activation.LEAKY_RELU) {
-                    derivative = out > 0 ? 1.0f : 0.01f;
-                }
+                float derivative = findActivationFunction(layer, neuron);
 
                 currentDeltas[neuron] = blameSum * derivative;
             }
@@ -155,6 +144,104 @@ public class FeedForwardNetwork implements Network, Neuron {
             }
         }
     }
+    public float[] accumulateGradientsForCnn(float[] input, float[] desiredOutputs) {
+        predict(input);
+
+        int lastLayerIdx = hiddenLayerDepth - 1;
+        float[] finalOutputs = hiddenLayerOutputs[lastLayerIdx];
+        float[] finalDeltas = hiddenLayerDeltas[lastLayerIdx];
+
+        for (int i = 0; i < outputSize; i++) {
+            float out = finalOutputs[i];
+            float error = out - desiredOutputs[i];
+            float derivative = 1.0f;
+
+            if (outputActivation == Activation.SIGMOID) {
+                derivative = out * (1.0f - out);
+            } else if (outputActivation == Activation.TANH) {
+                derivative = 1.0f - (out * out);
+            }
+
+            finalDeltas[i] = error * derivative;
+        }
+
+
+        for (int layer = hiddenLayerDepth - 2; layer >= 0; layer--) {
+            int currentWidth = layers[layer + 1];
+            int nextWidth = layers[layer + 2];
+
+            float[] currentDeltas = hiddenLayerDeltas[layer];
+            float[] nextDeltas = hiddenLayerDeltas[layer + 1];
+            float[] connectingWeights = hiddenLayerWeights[layer + 1];
+
+            for (int neuron = 0; neuron < currentWidth; neuron++) {
+                float blameSum = 0.0f;
+                for (int nextNeuron = 0; nextNeuron < nextWidth; nextNeuron++) {
+                    int weightIdx = (nextNeuron * currentWidth) + neuron;
+                    blameSum += nextDeltas[nextNeuron] * connectingWeights[weightIdx];
+                }
+                float derivative = findActivationFunction(layer, neuron);
+
+                currentDeltas[neuron] = blameSum * derivative;
+            }
+        }
+        float[] inputErrors = new float[inputSize];
+        float[] firstHiddenDeltas = hiddenLayerDeltas[0];
+        float[] firstHiddenWeights = hiddenLayerWeights[0];
+        int firstHiddenWidth = layers[1];
+
+        // We find out how much blame the flat CNN output deserves
+        for (int inNeuron = 0; inNeuron < inputSize; inNeuron++) {
+            float inputBlameSum = 0.0f;
+            for (int targetNeuron = 0; targetNeuron < firstHiddenWidth; targetNeuron++) {
+                int weightIdx = (targetNeuron * inputSize) + inNeuron;
+                inputBlameSum += firstHiddenDeltas[targetNeuron] * firstHiddenWeights[weightIdx];
+            }
+            // Notice there is no derivative applied here!
+            // The CNN will apply its own derivative during its backward pass.
+            inputErrors[inNeuron] = inputBlameSum;
+        }
+
+        for (int layer = 0; layer < hiddenLayerDepth; layer++) {
+            float[] targetDeltas = hiddenLayerDeltas[layer];
+
+            int targetWidth = layers[layer + 1];
+            int sourceWidth = layers[layer];
+
+            float[] sourceOutputs = (layer == 0) ? input : hiddenLayerOutputs[layer - 1];
+
+            float[] currentWeightGradients = weightGradients[layer];
+            float[] currentBiasGradients = biasGradients[layer];
+            int weightIndex = 0;
+
+            //bias
+            for (int targetNeuron = 0; targetNeuron < targetWidth; targetNeuron++) {
+                float targetDelta = targetDeltas[targetNeuron];
+                for (int sourceNeuron = 0; sourceNeuron < sourceWidth; sourceNeuron++) {
+                    currentWeightGradients[weightIndex++] += targetDelta * sourceOutputs[sourceNeuron];
+                }
+                currentBiasGradients[targetNeuron] += targetDelta;
+            }
+        }
+        return inputErrors;
+    }
+
+    private float findActivationFunction(int layer, int neuron) {
+        float out = hiddenLayerOutputs[layer][neuron];
+        float derivative = 1.0f;
+
+        if (hiddenActivation == Activation.SIGMOID) {
+            derivative = out * (1.0f - out);
+        } else if (hiddenActivation == Activation.TANH) {
+            derivative = 1.0f - (out * out);
+        } else if (hiddenActivation == Activation.RELU) {
+            derivative = out > 0 ? 1.0f : 0.0f;
+        } else if (hiddenActivation == Activation.LEAKY_RELU) {
+            derivative = out > 0 ? 1.0f : 0.01f;
+        }
+        return derivative;
+    }
+
 
     /**
      *
