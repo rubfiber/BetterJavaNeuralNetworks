@@ -1,4 +1,4 @@
-package org.example;
+package org.example.Usage;
 
 import org.network.Dataset;
 import org.network.FeedForward.Activation;
