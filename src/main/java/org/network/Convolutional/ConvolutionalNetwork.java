@@ -6,7 +6,7 @@ import org.network.util;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Arrays;
@@ -18,7 +18,7 @@ import static org.network.util.*;
 public class ConvolutionalNetwork {
 
     //filter size is 3x3 to avoid 6 nested loops
-    int filterSize = 3;
+    int filterSize;
     public int[] padding;
     public int batchSize;
 
@@ -39,7 +39,7 @@ public class ConvolutionalNetwork {
 
         cnnLayers = new ConvolutionalLayer[filters.length];
         for (int i = 0; i < filters.length; i++) {
-            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, 3, 0.1f);
+            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, 3);
         }
     }
 
@@ -68,7 +68,7 @@ public class ConvolutionalNetwork {
     int lastCnnWidth;
     int lastCnnFilters;
 
-    public void train(float[][][] image, float[] desiredOutput, float learningRate, int batchSize) {
+    public void train(float[][][] image, float[] desiredOutput) {
         float[][][] cnnOutput = forwardPass(image);
         int lastNumFilters = cnnOutput.length;         // depth/channels
         int lastHeight = cnnOutput[0].length;      // height
@@ -106,7 +106,6 @@ public class ConvolutionalNetwork {
                 indices[swap] = temp;
             }
 
-            float totalEpochLoss = 0.0f;
             for (int sample = 0; sample < numSamples; sample += batchSize) {
                 int currentBatchSize = Math.min(batchSize, numSamples - sample);
 
@@ -116,7 +115,7 @@ public class ConvolutionalNetwork {
                     float[][][] image = imageInputs[sampleIdx];
                     float[] target = desiredOutputs[sampleIdx];
 
-                    this.train(image, target, learningRate, currentBatchSize);
+                    this.train(image, target);
                 }
                 network.applyBatch(learningRate, currentBatchSize);
 
@@ -124,6 +123,7 @@ public class ConvolutionalNetwork {
                     layer.applyBatch(learningRate, currentBatchSize);
                 }
             }
+            System.out.println("Epoch: " + epoch);
         }
 
     }
@@ -165,19 +165,17 @@ public class ConvolutionalNetwork {
 
 
         int filterSize = 3;
-        int numChannels = 3;
         public int[] padding;
         float[] biases;
         int stride;
 
         int kernelSize;
-        float learningRate;
 
         float[][] lastInputColumn;
         float[][][] lastOutput;
         int numFilters;
 
-        public ConvolutionalLayer(int inChannels, int numFilters, int stride, int[] padding, int kernelSize, float learningRate) {
+        public ConvolutionalLayer(int inChannels, int numFilters, int stride, int[] padding, int kernelSize) {
             this.numFilters = numFilters;
             this.stride = stride;
             this.padding = padding;
@@ -185,8 +183,6 @@ public class ConvolutionalNetwork {
             this.biases = new float[numFilters];
             this.kernelSize = kernelSize;
 
-            float[][] lastInputColumn;
-            float[][][] lastOutput;
 
             float stdDev = (float) Math.sqrt(2.0 / (inChannels * filterSize * filterSize));
             Random rand = new Random();
@@ -220,7 +216,6 @@ public class ConvolutionalNetwork {
             int outWidth = (inWidth - kernelSize + padding[1] * 2) / stride + 1;
             float[][][] paddedInput = applyPadding(input, inChannels, inHeight, inWidth, pad);
 
-            int channels = input.length;
             int filters = weights.length;
             int patchRows = inChannels * k_height * k_width;
             int patchColumns = outHeight * outWidth;
@@ -248,11 +243,11 @@ public class ConvolutionalNetwork {
             }
             float[][] weightRow = new float[filters][patchRows];
 
-            for(int f = 0; f < filters; f++) {
+            for (int f = 0; f < filters; f++) {
                 int idx = 0;
-                for(int c = 0; c < inChannels; c++) {
-                    for(int ky = 0; ky < k_height; ky++) {
-                        for(int kx = 0; kx < k_width; kx++) {
+                for (int c = 0; c < inChannels; c++) {
+                    for (int ky = 0; ky < k_height; ky++) {
+                        for (int kx = 0; kx < k_width; kx++) {
                             weightRow[f][idx++] = weights[f][c][ky][kx];
                         }
                     }
@@ -292,8 +287,7 @@ public class ConvolutionalNetwork {
 
             int stepsY = (inHeight - kernelSize + padding[0] * 2) / stride + 1;
             int stepsX = (inWidth - kernelSize + padding[1] * 2) / stride + 1;
-            int colRowIdx = 0;
-            ;
+
             int colIdx = 0;
 
             for (int y = 0; y < stepsY; y++) {
@@ -342,11 +336,10 @@ public class ConvolutionalNetwork {
 
             this.lastInChannels = channels;
             //this.lastInHeight = inHeight;
-           // this.lastInWidth = inWidth;
+            // this.lastInWidth = inWidth;
 
             this.poolLastInHeight = inHeight;
             this.poolLastInWidth = inWidth;
-            this.lastInChannels = channels;
 
             output = new float[channels][outHeight][outWidth];
             maxIndicesX = new int[channels][outHeight][outWidth];
@@ -559,7 +552,6 @@ public class ConvolutionalNetwork {
 
         public float[][][] slideOverFeatureMap(float[][][] map) { //must be padded
 
-            int inChannels = map.length;
             int height = map[0].length;
             int width = map[0][0].length;
 
@@ -614,6 +606,7 @@ public class ConvolutionalNetwork {
         }
 
     }
+
     public float[][][][] floatImages;
     public float[][] outputs;
 
@@ -628,7 +621,7 @@ public class ConvolutionalNetwork {
         }
     }
 
-    public void addData(String dirPath) {
+    public void addData(String dirPath, String[] possibleAnswers, int squashSize) {
         ImageFileData[] imageFiles;
         try {
             imageFiles = Files.walk(Paths.get(dirPath))
@@ -638,12 +631,11 @@ public class ConvolutionalNetwork {
                         try {
                             BufferedImage img = ImageIO.read(path.toFile());
                             if (img == null) return null;
-                            // Capture the lowercase file name alongside the image
-                            int targetSize = 32;
+                            // 100x100 too big - size reduction to 32x32
+                            int targetSize = squashSize;
                             BufferedImage resizedImg = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
                             java.awt.Graphics2D g2d = resizedImg.createGraphics();
 
-                            // Draw the original image scaled down into the new 32x32 image
                             g2d.drawImage(img, 0, 0, targetSize, targetSize, null);
                             g2d.dispose();
                             return new ImageFileData(resizedImg, path.getFileName().toString().toLowerCase());
@@ -671,21 +663,24 @@ public class ConvolutionalNetwork {
             assert Arrays.stream(imageFiles)
                     .allMatch(item -> item.image.getHeight() == firstImageHeight);
 
-            // 1. Initialize floatImages AND outputs arrays
             floatImages = new float[imageFiles.length][3][firstImageHeight][firstImageWidth];
-            outputs = new float[imageFiles.length][2];
+            outputs = new float[imageFiles.length][possibleAnswers.length];
 
             for (int i = 0; i < imageFiles.length; i++) {
                 ImageFileData current = imageFiles[i];
 
-                // 2. Set One-Hot Encoded Targets based on filename
-                if (current.fileName.contains("banana")) {
-                    outputs[i] = new float[]{0.0f, 1.0f};
-                } else if (current.fileName.contains("blueberry")) {
-                    outputs[i] = new float[]{1.0f, 0.0f};
-                } else {
-                    System.err.println("Warning: File " + current.fileName + " contains neither 'cat' nor 'dog'. Defaulting to [0,0].");
-                    outputs[i] = new float[]{0.0f, 0.0f};
+                boolean matchFound = false;
+                for (int j = 0; j < possibleAnswers.length; j++) {
+                    // Check if the filename contains the target string (ignoring case)
+                    if (current.fileName.contains(possibleAnswers[j].toLowerCase())) {
+                        outputs[i][j] = 1.0f;
+                        matchFound = true;
+                        break;
+                    }
+                }
+
+                if (!matchFound) {
+                    System.err.println("Warning: File '" + current.fileName + "' does not match any provided answers. Defaulting to all 0s.");
                 }
 
                 // 3. Process image RGB pixels
@@ -693,9 +688,9 @@ public class ConvolutionalNetwork {
                     for (int x = 0; x < current.image.getWidth(); x++) {
                         int pixel = current.image.getRGB(x, y);
 
-                        float red   = (float) ((pixel >> 16) & 0xFF) / 255.0f;
-                        float green = (float) ((pixel >> 8)  & 0xFF) / 255.0f;
-                        float blue  = (float) (pixel         & 0xFF) / 255.0f;
+                        float red = (float) ((pixel >> 16) & 0xFF) / 255.0f;
+                        float green = (float) ((pixel >> 8) & 0xFF) / 255.0f;
+                        float blue = (float) (pixel & 0xFF) / 255.0f;
 
                         floatImages[i][0][y][x] = red;
                         floatImages[i][1][y][x] = green;
@@ -706,5 +701,78 @@ public class ConvolutionalNetwork {
         } catch (IOException e) {
             e.printStackTrace();
         }
+
+
+    }
+
+    public void saveState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) throws IOException {
+        try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(CNNFilePath))) {
+            dos.writeInt(cnnLayers.length);
+            for (int i = 0; i < cnnLayers.length; i++) {
+                ConvolutionalLayer layer = cnnLayers[i];
+                dos.writeInt(layer.biases.length);
+                for (int b = 0; b < layer.biases.length; b++) {
+                    dos.writeFloat(layer.biases[b]);
+                }
+
+                dos.writeInt(layer.weights.length);       // numFilters
+                dos.writeInt(layer.weights[0].length);    // inChannels
+                dos.writeInt(layer.weights[0][0].length); // filterHeight (3)
+                dos.writeInt(layer.weights[0][0][0].length); // filterWidth (3)
+
+                for (int f = 0; f < layer.weights.length; f++) {
+                    for (int c = 0; c < layer.weights[0].length; c++) {
+                        for (int y = 0; y < layer.weights[0][0].length; y++) {
+                            for (int x = 0; x < layer.weights[0][0][0].length; x++) {
+                                dos.writeFloat(layer.weights[f][c][y][x]);
+                            }
+                        }
+                    }
+                }
+            }
+
+        } catch (IOException e) {
+            System.err.println("Failed to save model: " + e.getMessage());
+        }
+
+        network.saveState(FFNWeightsPath, FFNBiasPath);
+
+    }
+
+    public void loadState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) throws IOException {
+        try (DataInputStream dis = new DataInputStream(new FileInputStream(CNNFilePath))) {
+            int numLayers =  dis.readInt();
+            if (numLayers != cnnLayers.length) {
+                System.err.println("Invalid number of layers: " + numLayers);
+            }
+
+            for (ConvolutionalLayer layer : cnnLayers) {
+                int numBiases = dis.readInt();
+                for (int b = 0; b < numBiases; b++) {
+                    layer.biases[b] = dis.readFloat();
+                }
+                    int numFilters = dis.readInt();
+                    int inChannels = dis.readInt();
+                    int fHeight = dis.readInt();
+                    int fWidth = dis.readInt();
+
+                    for (int f = 0; f < numFilters; f++) {
+                        for (int c = 0; c < inChannels; c++) {
+                            for (int y = 0; y < fHeight; y++) {
+                                for (int x = 0; x < fWidth; x++) {
+                                    // Overwrite the random initial weights with the trained ones
+                                    layer.weights[f][c][y][x] = dis.readFloat();
+                                }
+                            }
+                        }
+                    }
+                }
+
+        } catch (IOException e) {
+            System.err.println("Failed to load model: " + e.getMessage());
+        }
+
+        network.loadBias(FFNBiasPath);
+        network.loadWeights(FFNWeightsPath);
     }
 }

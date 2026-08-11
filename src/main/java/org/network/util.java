@@ -3,6 +3,7 @@ package org.network;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 public class util {
     public static float getElementFromFloatArray(FloatArray array, int[] indices, int numColumns) {
@@ -221,6 +222,15 @@ public class util {
         }
 
         return C;
+    }
+    public static int getIndexOfMax(float[] array) {
+        if (array == null || array.length == 0) {
+            return -1;
+        }
+
+        return IntStream.range(0, array.length)
+                .reduce((i, j) -> array[i] > array[j] ? i : j)
+               .getAsInt();
     }
     public static float relu(float output) {
         return Math.max(0, output);
