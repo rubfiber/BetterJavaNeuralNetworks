@@ -1,4 +1,4 @@
-package org.example.Usage;
+package org.example.Usage.Convolutional;
 
 import org.network.Convolutional.ConvolutionalNetwork;
 import org.network.util;
@@ -15,12 +15,12 @@ public class MainConvolutional {
         System.out.println("Building Convolutional Neural Network...");
 
         //test values - it will identify fruits
-        String[] fruits = new String[]{"Apple Braeburn", "Apple Granny Smith",
+        String[] fruits = new String[]{"apple", "Apple Granny Smith",
                 "Apricot", "Avocado", "Banana", "Blueberry", "Cactus fruit",
-                "Cantaloupe", "Cherry", "Clementine", "Corn", "Cucumber Ripe", "Grape Blue",
-                "Kiwi", "Lemon", "Limes", "Mango", "Onion White", "Orange", "Papaya", "Passion Fruit",
+                "Cantaloupe", "Cherry", "Clementine", "Corn", "cucumber", "Grape Blue",
+                "Kiwi", "Lemon", "lime", "Mango", "Onion White", "Orange", "Papaya", "Passion Fruit",
                 "Peach", "Pear", "Pepper Green", "Pepper Red", "Pineapple", "Plum", "Pomegranate",
-                "Potato Red", "Raspberry", "Strawberry", "Tomato", "Watermelon"};
+                "potato", "Raspberry", "Strawberry", "Tomato", "Watermelon"};
 
         int[] cnnFilters = {16, 32, 64};           // How many filters each layer outputs
         int[] cnnInputChannels = {3, 16, 32};      // How many channels each layer takes in
@@ -34,9 +34,9 @@ public class MainConvolutional {
         int[] ffnLayers = {2304, 256, 33}; //num fruits is 33
 
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
-       // cnn.addData("Data/TrainFruits/", fruits, 64);
+        cnn.addData("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f);
 
-     //   cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.01f, 32, 10);
+        cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.01f, 32, 10);
 
         System.out.println("Network built successfully!");
 
@@ -69,7 +69,7 @@ public class MainConvolutional {
             }
         }
         System.out.println("Saving and loading..."); //test save and load
-     //   cnn.saveState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
+        cnn.saveState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
         cnn.loadState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
 
          float[] prediction = cnn.predict(floatArray);

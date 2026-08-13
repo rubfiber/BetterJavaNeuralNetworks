@@ -3,6 +3,8 @@ package org.network.Convolutional;
 import org.network.FeedForward.Activation;
 import org.network.FeedForward.FeedForwardNetwork;
 import org.network.util;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -17,6 +19,7 @@ import static org.network.util.*;
 
 public class ConvolutionalNetwork {
 
+    private static final Logger log = LoggerFactory.getLogger(ConvolutionalNetwork.class);
     //filter size is 3x3 to avoid 6 nested loops
     int filterSize;
     public int[] padding;
@@ -335,8 +338,7 @@ public class ConvolutionalNetwork {
             int outWidth = inWidth / poolSize;
 
             this.lastInChannels = channels;
-            //this.lastInHeight = inHeight;
-            // this.lastInWidth = inWidth;
+
 
             this.poolLastInHeight = inHeight;
             this.poolLastInWidth = inWidth;
@@ -621,8 +623,10 @@ public class ConvolutionalNetwork {
         }
     }
 
-    public void addData(String dirPath, String[] possibleAnswers, int squashSize) {
+    public void addData(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange) {
         ImageFileData[] imageFiles;
+        Random rand = new Random();
+
         try {
             imageFiles = Files.walk(Paths.get(dirPath))
                     .filter(Files::isRegularFile)
@@ -631,8 +635,7 @@ public class ConvolutionalNetwork {
                         try {
                             BufferedImage img = ImageIO.read(path.toFile());
                             if (img == null) return null;
-                            // 100x100 too big - size reduction to 32x32
-                            int targetSize = squashSize;
+
                             BufferedImage resizedImg = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
                             java.awt.Graphics2D g2d = resizedImg.createGraphics();
 
@@ -683,33 +686,52 @@ public class ConvolutionalNetwork {
                     System.err.println("Warning: File '" + current.fileName + "' does not match any provided answers. Defaulting to all 0s.");
                 }
 
-                // 3. Process image RGB pixels
+                // Generate random color jitter factors per image
+                float bFactor = (rand.nextFloat() * 2f - 1f) * brightnessRange;               // Brightness delta
+                float cFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * contrastRange;         // Contrast multiplier
+                float sFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * saturationRange;       // Saturation multiplier
+
+                // Process image RGB pixels with augmentation
                 for (int y = 0; y < current.image.getHeight(); y++) {
                     for (int x = 0; x < current.image.getWidth(); x++) {
                         int pixel = current.image.getRGB(x, y);
 
-                        float red = (float) ((pixel >> 16) & 0xFF) / 255.0f;
-                        float green = (float) ((pixel >> 8) & 0xFF) / 255.0f;
-                        float blue = (float) (pixel & 0xFF) / 255.0f;
+                        // 1. Base RGB extraction [0.0, 1.0]
+                        float red   = (float) ((pixel >> 16) & 0xFF) / 255.0f;
+                        float green = (float) ((pixel >> 8)  & 0xFF) / 255.0f;
+                        float blue  = (float) (pixel         & 0xFF) / 255.0f;
 
-                        floatImages[i][0][y][x] = red;
-                        floatImages[i][1][y][x] = green;
-                        floatImages[i][2][y][x] = blue;
+                        // 2. Brightness Shift
+                        red   += bFactor;
+                        green += bFactor;
+                        blue  += bFactor;
+
+                        // 3. Contrast Adjustment
+                        red   = (red   - 0.5f) * cFactor + 0.5f;
+                        green = (green - 0.5f) * cFactor + 0.5f;
+                        blue  = (blue  - 0.5f) * cFactor + 0.5f;
+
+                        // 4. Saturation Adjustment (via Grayscale Luminance)
+                        float gray = 0.299f * red + 0.587f * green + 0.114f * blue;
+                        red   = gray + (red   - gray) * sFactor;
+                        green = gray + (green - gray) * sFactor;
+                        blue  = gray + (blue  - gray) * sFactor;
+
+                        // 5. Clamp to valid [0.0, 1.0] range
+                        floatImages[i][0][y][x] = Math.clamp(red, 0.0f, 1.0f);
+                        floatImages[i][1][y][x] = Math.clamp(green, 0.0f, 1.0f);
+                        floatImages[i][2][y][x] = Math.clamp(blue, 0.0f, 1.0f);
                     }
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("error: ", e);
         }
-
-
     }
-
-    public void saveState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) throws IOException {
+    public void saveState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) {
         try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(CNNFilePath))) {
             dos.writeInt(cnnLayers.length);
-            for (int i = 0; i < cnnLayers.length; i++) {
-                ConvolutionalLayer layer = cnnLayers[i];
+            for (ConvolutionalLayer layer : cnnLayers) {
                 dos.writeInt(layer.biases.length);
                 for (int b = 0; b < layer.biases.length; b++) {
                     dos.writeFloat(layer.biases[b]);
