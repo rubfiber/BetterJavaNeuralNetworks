@@ -11,7 +11,7 @@ import java.util.Arrays;
 public class Main {
     public static void main(String[] args) throws IOException {
         FeedForwardNetwork network = new FeedForwardNetwork(new int[]{2, 3, 4, 1});
-        network.setOutputActivation(Activation.RELU);
+        network.fillOutputActivation(Activation.RELU);
 
         // XOR
         float[][] trainingData = {
