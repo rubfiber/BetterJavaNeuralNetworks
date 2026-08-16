@@ -7,12 +7,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Objects;
+
 import java.util.Random;
 
 import static org.network.util.*;
@@ -21,13 +22,13 @@ public class ConvolutionalNetwork {
 
     private static final Logger log = LoggerFactory.getLogger(ConvolutionalNetwork.class);
     //filter size is 3x3 to avoid 6 nested loops
-    int filterSize;
+    public int filterSize;
     public int[] padding;
     public int batchSize;
 
     public ConvolutionalLayer[] cnnLayers;
-    FeedForwardNetwork network;
-    int[] filters;
+    public FeedForwardNetwork network;
+    public int[] filters;
 
 
     public ConvolutionalNetwork(filterBuilder builder, int[] FFNLayers, int[] filters, int[] inputChannels, int[] stride) {
@@ -37,8 +38,8 @@ public class ConvolutionalNetwork {
         this.padding = builder.padding;
 
         network = new FeedForwardNetwork(FFNLayers);
-        network.setHiddenActivations(Activation.RELU);
-        network.setOutputActivation(Activation.SOFTMAX);
+        network.fillHiddenActivations(Activation.RELU);
+        network.fillOutputActivation(Activation.SOFTMAX);
 
         cnnLayers = new ConvolutionalLayer[filters.length];
         for (int i = 0; i < filters.length; i++) {
@@ -101,7 +102,7 @@ public class ConvolutionalNetwork {
             indices[i] = i;
         }
         Random random = new Random();
-        for (int epoch = 0; epoch < epochs; epoch++) {
+        for (int epoch = 1; epoch <= epochs; epoch++) {
             for (int i = 0; i < numSamples; i++) {
                 int swap = random.nextInt(numSamples);
                 int temp = indices[i];
@@ -611,123 +612,117 @@ public class ConvolutionalNetwork {
 
     public float[][][][] floatImages;
     public float[][] outputs;
+    public float[][] imagePos;
 
-    // Helper wrapper class to keep track of the image and its path together
-    private static class ImageFileData {
-        BufferedImage image;
-        String fileName;
+    public void addData(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange, float shiftRange, Color imgBackgroundColor) {
 
-        ImageFileData(BufferedImage image, String fileName) {
-            this.image = image;
-            this.fileName = fileName;
+        if (shiftRange != 0) {
+            network.setOutputActivationWithIndex(network.outputSize-1, Activation.SIGMOID);
+            network.setOutputActivationWithIndex(network.outputSize-2, Activation.SIGMOID); // for X and Y since they're different from the classification prediction
         }
-    }
+        Path[] imagePaths;
 
-    public void addData(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange) {
-        ImageFileData[] imageFiles;
-        Random rand = new Random();
-
-        try {
-            imageFiles = Files.walk(Paths.get(dirPath))
+        // find all image files
+        try (var stream = Files.walk(Paths.get(dirPath))) {
+            imagePaths = stream
                     .filter(Files::isRegularFile)
                     .filter(path -> path.toString().matches(".*\\.(png|jpg|jpeg|gif|bmp)$"))
-                    .map(path -> {
-                        try {
-                            BufferedImage img = ImageIO.read(path.toFile());
-                            if (img == null) return null;
+                    .toArray(Path[]::new);
+        } catch (IOException e) {
+            log.error("Failed to walk directory: ", e);
+            return;
+        }
 
-                            BufferedImage resizedImg = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
-                            java.awt.Graphics2D g2d = resizedImg.createGraphics();
+        if (imagePaths.length == 0) {
+            System.out.println("No images found in " + dirPath);
+            return;
+        }
 
-                            g2d.drawImage(img, 0, 0, targetSize, targetSize, null);
-                            g2d.dispose();
-                            return new ImageFileData(resizedImg, path.getFileName().toString().toLowerCase());
-                        } catch (IOException e) {
-                            System.err.println("Failed to read: " + path);
-                            return null;
-                        }
-                    })
-                    .filter(Objects::nonNull)
-                    .toArray(ImageFileData[]::new);
+        System.out.println("Loaded " + imagePaths.length + " image paths into queue.");
 
-            if (imageFiles.length == 0) {
-                System.out.println("No images found in " + dirPath);
-                return;
+        floatImages = new float[imagePaths.length][3][targetSize][targetSize];
+        outputs = new float[imagePaths.length][possibleAnswers.length];
+        imagePos = new float[imagePaths.length][2]; // (x, y)
+
+        Random rand = new Random();
+        int maxShiftPixels = Math.round(targetSize * shiftRange);
+
+        for (int i = 0; i < imagePaths.length; i++) {
+            Path path = imagePaths[i];
+            String fileName = path.getFileName().toString().toLowerCase();
+
+            boolean matchFound = false;
+            for (int j = 0; j < possibleAnswers.length; j++) {
+                if (fileName.contains(possibleAnswers[j].toLowerCase())) {
+                    outputs[i][j] = 1.0f;
+                    matchFound = true;
+                    break;
+                }
+            }
+            if (!matchFound) {
+                System.err.println("Warning: File '" + fileName + "' does not match any answers. Defaulting to 0s.");
             }
 
-            System.out.println("Loaded " + imageFiles.length + " images into the array.");
+            try {
+                BufferedImage rawImg = ImageIO.read(path.toFile());
+                if (rawImg == null) continue;
 
-            int firstImageHeight = imageFiles[0].image.getHeight();
-            int firstImageWidth = imageFiles[0].image.getWidth();
+                BufferedImage canvas = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = canvas.createGraphics();
 
-            // Check if all images match dimensions
-            assert Arrays.stream(imageFiles)
-                    .allMatch(item -> item.image.getWidth() == firstImageWidth);
-            assert Arrays.stream(imageFiles)
-                    .allMatch(item -> item.image.getHeight() == firstImageHeight);
+                // background color
+                g2d.setColor(imgBackgroundColor);
+                g2d.fillRect(0, 0, targetSize, targetSize);
 
-            floatImages = new float[imageFiles.length][3][firstImageHeight][firstImageWidth];
-            outputs = new float[imageFiles.length][possibleAnswers.length];
+                int shiftX = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
+                int shiftY = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
+                imagePos[i][0] = 0.5f + ((float) shiftX / targetSize);
+                imagePos[i][1] = 0.5f + ((float) shiftY / targetSize);
+                g2d.drawImage(rawImg, shiftX, shiftY, targetSize, targetSize, null);
+                g2d.dispose();
 
-            for (int i = 0; i < imageFiles.length; i++) {
-                ImageFileData current = imageFiles[i];
+                // change color of image slightly
+                float bFactor = (rand.nextFloat() * 2f - 1f) * brightnessRange;
+                float cFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * contrastRange;
+                float sFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * saturationRange;
 
-                boolean matchFound = false;
-                for (int j = 0; j < possibleAnswers.length; j++) {
-                    // Check if the filename contains the target string (ignoring case)
-                    if (current.fileName.contains(possibleAnswers[j].toLowerCase())) {
-                        outputs[i][j] = 1.0f;
-                        matchFound = true;
-                        break;
-                    }
-                }
+                // rgb bitwise
+                for (int y = 0; y < targetSize; y++) {
+                    for (int x = 0; x < targetSize; x++) {
+                        int pixel = canvas.getRGB(x, y);
 
-                if (!matchFound) {
-                    System.err.println("Warning: File '" + current.fileName + "' does not match any provided answers. Defaulting to all 0s.");
-                }
+                        float red   = ((pixel >> 16) & 0xFF) / 255.0f;
+                        float green = ((pixel >> 8)  & 0xFF) / 255.0f;
+                        float blue  = (pixel         & 0xFF) / 255.0f;
 
-                // Generate random color jitter factors per image
-                float bFactor = (rand.nextFloat() * 2f - 1f) * brightnessRange;               // Brightness delta
-                float cFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * contrastRange;         // Contrast multiplier
-                float sFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * saturationRange;       // Saturation multiplier
-
-                // Process image RGB pixels with augmentation
-                for (int y = 0; y < current.image.getHeight(); y++) {
-                    for (int x = 0; x < current.image.getWidth(); x++) {
-                        int pixel = current.image.getRGB(x, y);
-
-                        // 1. Base RGB extraction [0.0, 1.0]
-                        float red   = (float) ((pixel >> 16) & 0xFF) / 255.0f;
-                        float green = (float) ((pixel >> 8)  & 0xFF) / 255.0f;
-                        float blue  = (float) (pixel         & 0xFF) / 255.0f;
-
-                        // 2. Brightness Shift
+                        // brightness for variation
                         red   += bFactor;
                         green += bFactor;
                         blue  += bFactor;
 
-                        // 3. Contrast Adjustment
+                        // contrast
                         red   = (red   - 0.5f) * cFactor + 0.5f;
                         green = (green - 0.5f) * cFactor + 0.5f;
                         blue  = (blue  - 0.5f) * cFactor + 0.5f;
 
-                        // 4. Saturation Adjustment (via Grayscale Luminance)
+                        // saturation
                         float gray = 0.299f * red + 0.587f * green + 0.114f * blue;
                         red   = gray + (red   - gray) * sFactor;
                         green = gray + (green - gray) * sFactor;
                         blue  = gray + (blue  - gray) * sFactor;
 
-                        // 5. Clamp to valid [0.0, 1.0] range
                         floatImages[i][0][y][x] = Math.clamp(red, 0.0f, 1.0f);
                         floatImages[i][1][y][x] = Math.clamp(green, 0.0f, 1.0f);
                         floatImages[i][2][y][x] = Math.clamp(blue, 0.0f, 1.0f);
                     }
                 }
+
+            } catch (IOException e) {
+                log.error("Failed to process image: {}", path, e);
             }
-        } catch (IOException e) {
-            log.error("error: ", e);
         }
     }
+
     public void saveState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) {
         try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(CNNFilePath))) {
             dos.writeInt(cnnLayers.length);
