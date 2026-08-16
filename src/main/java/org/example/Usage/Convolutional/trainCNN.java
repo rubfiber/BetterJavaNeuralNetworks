@@ -4,12 +4,13 @@ import org.network.Convolutional.ConvolutionalNetwork;
 import org.network.util;
 
 import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
-public class MainConvolutional {
+public class trainCNN {
      static void main(String[] args) throws IOException {
 
         System.out.println("Building Convolutional Neural Network...");
@@ -31,12 +32,22 @@ public class MainConvolutional {
         int[][] dummyInputSize = new int[32][32];
         ConvolutionalNetwork.filterBuilder builder = new ConvolutionalNetwork.filterBuilder(dummyInputSize, padding, 32, 3);
 
-        int[] ffnLayers = {2304, 256, 33}; //num fruits is 33
+        int[] ffnLayers = {2304, 256, 35}; //num fruits is 33 + (x, y)
 
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
-        cnn.addData("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f);
+        cnn.addData("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f, 0.4f, Color.WHITE);
 
-        cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.01f, 32, 10);
+         int numSamples = cnn.outputs.length;
+         int numClasses = cnn.outputs[0].length;
+         int numCoords = cnn.imagePos[0].length;
+
+         float[][] outputAndPos = new float[numSamples][numClasses + numCoords];
+
+         for (int i = 0; i < numSamples; i++) {
+             System.arraycopy(cnn.outputs[i], 0, outputAndPos[i], 0, numClasses);
+             System.arraycopy(cnn.imagePos[i], 0, outputAndPos[i], numClasses, numCoords);
+         }
+         cnn.trainDataset(cnn.floatImages, outputAndPos, 0.01f, 32, 10);
 
         System.out.println("Network built successfully!");
 
@@ -47,7 +58,7 @@ public class MainConvolutional {
         // 64 x 64
         int targetSize = 64;
         BufferedImage image = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
-        java.awt.Graphics2D g2d = image.createGraphics();
+        Graphics2D g2d = image.createGraphics();
         g2d.drawImage(originalImage, 0, 0, targetSize, targetSize, null);
         g2d.dispose();
 
@@ -59,9 +70,9 @@ public class MainConvolutional {
                 int rgb = image.getRGB(x, y);
 
                 // RGB bitwise
-                float r = ((rgb >> 16) & 0xFF);
-                float g = ((rgb >> 8) & 0xFF);
-                float b = (rgb & 0xFF);
+                float r = ((rgb >> 16) & 0xFF) / 255.0f;
+                float g = ((rgb >> 8) & 0xFF) / 255.0f;
+                float b = (rgb & 0xFF) / 255.0f;
 
                 floatArray[0][y][x] = r;
                 floatArray[1][y][x] = g;
