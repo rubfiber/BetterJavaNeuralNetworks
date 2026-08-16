@@ -31,7 +31,7 @@ public class WebcamTrain {
         webcam.setViewSize(new Dimension(640, 480));
         webcam.open();
 
-        JFrame window = new JFrame("Camera with 100x100 Target Box");
+        JFrame window = new JFrame("Camera");
 
         // 1. Create WebCam Panel
         JLayeredPane layeredPane = getJLayeredPane(webcam);

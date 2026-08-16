@@ -117,7 +117,6 @@ public class util {
             List<Float> innerList = list.get(i);
             array[i] = new float[innerList.size()];
             for (int j = 0; j < innerList.size(); j++) {
-                // Safe unboxing; handles null checking if necessary
                 Float value = innerList.get(j);
                 array[i][j] = (value != null) ? value : 0.0f;
             }

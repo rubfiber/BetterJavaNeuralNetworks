@@ -4,10 +4,11 @@ import com.github.sarxos.webcam.Webcam;
 import com.github.sarxos.webcam.WebcamPanel;
 import com.github.sarxos.webcam.WebcamResolution;
 import org.network.Convolutional.ConvolutionalNetwork;
+import org.network.FeedForward.Activation;
 import org.network.util;
 
 import javax.imageio.ImageIO;
-import javax.swing.JFrame;
+import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -32,14 +33,17 @@ public class WebcamTest {
         int[][] dummyInputSize = new int[32][32];
         ConvolutionalNetwork.filterBuilder builder = new ConvolutionalNetwork.filterBuilder(dummyInputSize, padding, 32, 3);
 
-        int[] ffnLayers = {2304, 256, 33}; //num fruits is 33
+        int[] ffnLayers = {2304, 256, 35}; //num fruits is 33 + (x,y) pos
 
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
+
+        cnn.network.setOutputActivationWithIndex(cnn.network.outputSize - 1, Activation.SIGMOID);
+        cnn.network.setOutputActivationWithIndex(cnn.network.outputSize - 2, Activation.SIGMOID);
         cnn.loadState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
 
         int channels = 3;
 
-        Webcam webcam = Webcam.getDefault();
+        Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video3"); //Logitech
         webcam.setViewSize(new Dimension(640, 480));
         webcam.open();
 
@@ -47,14 +51,24 @@ public class WebcamTest {
 
 
         WebcamPanel panel = new WebcamPanel(webcam);
-        panel.setFPSDisplayed(true); // Shows framerate info
-        panel.setMirrored(true);     // Mirrors video for standard view
+        panel.setFPSDisplayed(true);
+        panel.setMirrored(true);
 
-        // Set up the window frame container
+        panel.setBounds(0, 0, 640, 480);
+
         JFrame window = new JFrame("Java Webcam Viewer");
-        window.add(panel);
         window.setResizable(false);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+
+        CenterBoxOverlay overlay = new CenterBoxOverlay(400, 0, 0);
+        overlay.setBounds(0, 0, 640, 480);
+
+        JLayeredPane layeredPane = new JLayeredPane();
+        layeredPane.setPreferredSize(new Dimension(640, 480));
+        layeredPane.add(panel, JLayeredPane.DEFAULT_LAYER);
+        layeredPane.add(overlay, JLayeredPane.PALETTE_LAYER);
+
+        window.add(layeredPane);
         window.pack();
         window.setVisible(true);
         int targetSize = 64;
@@ -63,14 +77,13 @@ public class WebcamTest {
             while (webcam.isOpen()) {
                 BufferedImage frame = webcam.getImage(); // raw frame
 
+
                 if (frame != null) {
-                    // FIX 1: Initialize the array with targetSize, NOT frame height/width
                     float[][][] floatArray = new float[channels][targetSize][targetSize];
 
                     BufferedImage image = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
                     java.awt.Graphics2D g2d = image.createGraphics();
 
-                    // FIX 2: Draw the 'frame' onto the 'image', not image onto image
                     g2d.drawImage(frame, 0, 0, targetSize, targetSize, null);
                     g2d.dispose();
 
@@ -79,7 +92,6 @@ public class WebcamTest {
 
                             int pixel = image.getRGB(x, y);
 
-                            // FIX 3: Divide by 255.0f to match your training normalization!
                             float r = ((pixel >> 16) & 0xFF) / 255.0f;
                             float g = ((pixel >> 8) & 0xFF) / 255.0f;
                             float b = (pixel & 0xFF) / 255.0f;
@@ -89,7 +101,6 @@ public class WebcamTest {
                             floatArray[2][y][x] = b;
                         }
                     }
-
                     long startTime = System.nanoTime();
                     float[] prediction = cnn.predict(floatArray);
                     long endTime = System.nanoTime();
@@ -97,8 +108,16 @@ public class WebcamTest {
                     System.out.println("\nPrediction completed in " + (endTime - startTime) / 1_000_000 + " ms");
                     System.out.println("Output (Softmax Probabilities): " + Arrays.toString(prediction));
 
-                    int max = util.getIndexOfMax(prediction);
+                    int max = util.getIndexOfMax(Arrays.copyOfRange(prediction, 0, fruits.length));
                     System.out.println("Fruit: " + fruits[max]);
+                    System.out.println("Output: " + Arrays.toString(prediction));
+                    float[] pos = (Arrays.copyOfRange(prediction, fruits.length, prediction.length));
+                    System.out.println("Normalized pos: " + Arrays.toString(pos));
+
+                    int pixelX = (int) (pos[0] * 640);
+                    int pixelY = (int) (pos[1] * 480);
+
+                    overlay.updatePosition(pixelX, pixelY, fruits[max] + " " + Math.round(prediction[max] * 100 * 10.0) / 10.0 + "%");
                 }
 
                 try { Thread.sleep(33); } catch (InterruptedException e) { break; }
