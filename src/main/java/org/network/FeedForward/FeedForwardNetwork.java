@@ -9,23 +9,22 @@ import java.io.*;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.Random;
-
-import static org.network.util.sigmoid;
-import static org.network.util.softmax;
+import java.util.stream.IntStream;
 
 public class FeedForwardNetwork implements Network, Neuron {
-    int inputSize;
-    int hiddenLayerDepth;
-    int outputSize;
+    public int inputSize;
+    public int hiddenLayerDepth;
+    public int outputSize;
     public float[][] hiddenLayerWeights;
     public float[][] hiddenLayerBias;
     public float[] outputLayerWeights;
     public float[] outputLayerBias;
 
-    float[][] hiddenLayerOutputs;
+    public float[][] hiddenLayerOutputs;
 
-    float[][] hiddenLayerDeltas;
+    public float[][] hiddenLayerDeltas;
 
     public float[][] weightGradients;
     public float[][] biasGradients;
@@ -34,17 +33,19 @@ public class FeedForwardNetwork implements Network, Neuron {
     public FloatArray currentDesiredOutputs;
 
     public int totalNetworkLength;
-    int[] layers;
+    public int[] layers;
 
-    Activation outputActivation =  Activation.SIGMOID;
-    Activation hiddenActivation = Activation.TANH;
+    public Activation[] outputActivations;
+    public Activation[][] hiddenActivations;
 
+    int[] softmaxIndices;
 
     /**
      *
      * @param layers This is how the layers will be formatted for your net - you can adjust the number of hidden layers by adding more elements between the first and the last and the neurons per layer by increasing the number of the layer you want to change
      */
     public FeedForwardNetwork(int[] layers) {
+
         this.layers = layers;
 
         this.inputSize = layers[0];
@@ -62,6 +63,11 @@ public class FeedForwardNetwork implements Network, Neuron {
         weightGradients = new float[hiddenLayerDepth][];
         biasGradients = new float[hiddenLayerDepth][];
 
+        outputActivations = new Activation[outputSize];
+        hiddenActivations = new Activation[hiddenLayerDepth][];
+
+        Arrays.fill(outputActivations, Activation.SIGMOID);
+
         for (int i = 0; i < hiddenLayerDepth; i++) {
             int currentLayerSize = layers[i];
             int nextLayerSize = layers[i + 1];
@@ -72,9 +78,13 @@ public class FeedForwardNetwork implements Network, Neuron {
             hiddenLayerDeltas[i] = new float[nextLayerSize];
             weightGradients[i] = new float[currentLayerSize * nextLayerSize];
             biasGradients[i] = new float[nextLayerSize];
+            hiddenActivations[i] = new Activation[nextLayerSize];
+            Arrays.fill(hiddenActivations[i],  Activation.LEAKY_RELU);
         }
 
         initializeHiddenLayers();
+
+
     }
 
     /**
@@ -93,9 +103,9 @@ public class FeedForwardNetwork implements Network, Neuron {
             float error = out - desiredOutputs[i];
             float derivative = 1.0f;
 
-            if (outputActivation == Activation.SIGMOID) {
+            if (outputActivations[i] == Activation.SIGMOID) {
                 derivative = out * (1.0f - out);
-            } else if (outputActivation == Activation.TANH) {
+            } else if (outputActivations[i] == Activation.TANH) {
                 derivative = 1.0f - (out * out);
             }
 
@@ -156,9 +166,9 @@ public class FeedForwardNetwork implements Network, Neuron {
             float error = out - desiredOutputs[i];
             float derivative = 1.0f;
 
-            if (outputActivation == Activation.SIGMOID) {
+            if (outputActivations[i] == Activation.SIGMOID) {
                 derivative = out * (1.0f - out);
-            } else if (outputActivation == Activation.TANH) {
+            } else if (outputActivations[i] == Activation.TANH) {
                 derivative = 1.0f - (out * out);
             }
 
@@ -230,15 +240,15 @@ public class FeedForwardNetwork implements Network, Neuron {
         float out = hiddenLayerOutputs[layer][neuron];
         float derivative = 1.0f;
 
-        if (hiddenActivation == Activation.SIGMOID) {
+        if (hiddenActivations[layer][neuron] == Activation.SIGMOID) {
             derivative = out * (1.0f - out);
-        } else if (hiddenActivation == Activation.TANH) {
+        } else if (hiddenActivations[layer][neuron] == Activation.TANH) {
             derivative = 1.0f - (out * out);
-        } else if (hiddenActivation == Activation.RELU) {
+        } else if (hiddenActivations[layer][neuron] == Activation.RELU) {
             derivative = out > 0 ? 1.0f : 0.0f;
-        } else if (hiddenActivation == Activation.LEAKY_RELU) {
+        } else if (hiddenActivations[layer][neuron] == Activation.LEAKY_RELU) {
             derivative = out > 0 ? 1.0f : 0.01f;
-        }
+        } // linear is already 1
         return derivative;
     }
 
@@ -301,12 +311,37 @@ public class FeedForwardNetwork implements Network, Neuron {
 
         }
     }
-    public void setOutputActivation(Activation activation) {
-        outputActivation = activation;
+    public void fillOutputActivation(Activation activation) {
+        Arrays.fill(outputActivations, activation);
+        refreshSoftmaxOutput();
     }
-    public void setHiddenActivations(Activation activation) {
-        hiddenActivation = activation;
+
+    public void fillHiddenActivations(Activation activation) {
+        for (int i = 0; i < hiddenLayerDepth; i++) {
+            Arrays.fill(hiddenActivations[i], activation);
+        }
     }
+    public void setOutputActivation(Activation[] activations) {
+        outputActivations = activations;
+        refreshSoftmaxOutput();
+    }
+    public void setOutputActivationWithIndex(int index, Activation activation) {
+        outputActivations[index] = activation;
+        refreshSoftmaxOutput();
+    }
+    public void setHiddenActivation(int layerIndex, Activation[] activations) {
+        int expectedSize = layers[layerIndex + 1];
+        if (activations.length != expectedSize) {
+            throw new IllegalArgumentException("Layer " + layerIndex + " expects " + expectedSize + " activations, got " + activations.length);
+        }
+        this.hiddenActivations[layerIndex] = activations;
+    }
+    private void refreshSoftmaxOutput() { //after changing output activations, softmax can
+        softmaxIndices = IntStream.range(0, outputActivations.length)
+                .filter(i -> Objects.equals(outputActivations[i], Activation.SOFTMAX))
+                .toArray();
+    }
+
     /**
      * The model makes a prediction based on an input, using math to calculate its output from the weights and biases
      * @param input The data you want the model to make a prediction from
@@ -314,6 +349,8 @@ public class FeedForwardNetwork implements Network, Neuron {
      */
     @Override
     public float[] predict(float[] input) {
+
+
         if (input.length != inputSize) {
             throw new IllegalArgumentException("FATAL: Network expected input of size " + inputSize + " but got " + input.length);
         }
@@ -336,24 +373,29 @@ public class FeedForwardNetwork implements Network, Neuron {
                     sum += currentInput[inNeuron] * weights[wIndex++];
                 }
                 sum += bias[outNeuron];
-                if (layer == hiddenLayerDepth - 1) {
+                if (layer == hiddenLayerDepth - 1) { // output layer
+                    Activation currentActivation = outputActivations[outNeuron];
 
-                    if (outputActivation == Activation.SOFTMAX || outputActivation == Activation.LINEAR) {
-                        outputs[outNeuron] = sum; // Softmax and Linear need the raw sum!
-                    } else if (outputActivation == Activation.SIGMOID) {
+                    if (currentActivation == Activation.SOFTMAX || currentActivation == Activation.LINEAR) {
+                        outputs[outNeuron] = sum;
+                    } else if (currentActivation == Activation.SIGMOID) {
                         outputs[outNeuron] = util.sigmoid(sum);
-                    } else if (outputActivation == Activation.TANH) {
-                        outputs[outNeuron] = (float) Math.tanh(sum); // Fixed Math.tanh!
+                    } else if (currentActivation == Activation.TANH) {
+                        outputs[outNeuron] = (float) Math.tanh(sum);
+                    } else if (currentActivation == Activation.RELU) {
+                        outputs[outNeuron] = util.relu(sum);
+                    } else if (currentActivation == Activation.LEAKY_RELU) {
+                        outputs[outNeuron] = util.leakyRelu(sum);
                     } else {
-                        outputs[outNeuron] = sum; // Safe fallback
+                        outputs[outNeuron] = sum;
                     }
                 } else {
-
-                    if (hiddenActivation == Activation.RELU) {
+                    Activation currentActivation = hiddenActivations[layer][outNeuron];
+                    if (currentActivation == Activation.RELU) {
                         outputs[outNeuron] = util.relu(sum);
-                    } else if (hiddenActivation == Activation.LEAKY_RELU) {
+                    } else if (currentActivation == Activation.LEAKY_RELU) {
                         outputs[outNeuron] = util.leakyRelu(sum);
-                    } else if (hiddenActivation == Activation.TANH) {
+                    } else if (currentActivation == Activation.TANH) {
                         outputs[outNeuron] = (float) Math.tanh(sum);
                     } else {
                         outputs[outNeuron] = util.sigmoid(sum);
@@ -363,7 +405,26 @@ public class FeedForwardNetwork implements Network, Neuron {
 
             currentInput = outputs;
         }
-        return (outputActivation == Activation.SOFTMAX) ? softmax(hiddenLayerOutputs[hiddenLayerDepth - 1]) : hiddenLayerOutputs[hiddenLayerDepth - 1];
+        float[] finalOutputs = hiddenLayerOutputs[hiddenLayerDepth - 1];
+
+        if (softmaxIndices.length > 0) {
+            float max = Float.NEGATIVE_INFINITY;
+            for (int idx : softmaxIndices) {
+                if (finalOutputs[idx] > max) max = finalOutputs[idx];
+            }
+
+            float sum = 0.0f;
+            for (int idx : softmaxIndices) {
+                finalOutputs[idx] = (float) Math.exp(finalOutputs[idx] - max);
+                sum += finalOutputs[idx];
+            }
+
+            for (int idx : softmaxIndices) {
+                finalOutputs[idx] /= sum;
+            }
+        }
+
+        return finalOutputs;
     }
 
     /**
