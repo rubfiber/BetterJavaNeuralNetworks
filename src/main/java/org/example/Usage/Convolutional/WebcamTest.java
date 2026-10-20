@@ -32,9 +32,12 @@ public class WebcamTest {
 
         int[][] dummyInputSize = new int[32][32];
         ConvolutionalNetwork.filterBuilder builder = new ConvolutionalNetwork.filterBuilder(dummyInputSize, padding, 32, 3);
+        int gridSize = 4;
+        int numCells = gridSize * gridSize; // 16
+        int featuresPerCell = 1 + 4 + fruits.length; // 38
+        int totalOutputs = numCells * featuresPerCell; // 608
 
-        int[] ffnLayers = {2304, 256, 35}; //num fruits is 33 + (x,y) pos
-
+        int[] ffnLayers = {2304, 256, totalOutputs};
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
 
         cnn.network.setOutputActivationWithIndex(cnn.network.outputSize - 1, Activation.SIGMOID);
@@ -43,7 +46,8 @@ public class WebcamTest {
 
         int channels = 3;
 
-        Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video3"); //Logitech
+       // Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video3"); //Logitech
+        Webcam webcam =  Webcam.getDefault();
         webcam.setViewSize(new Dimension(640, 480));
         webcam.open();
 
@@ -104,10 +108,9 @@ public class WebcamTest {
                     long startTime = System.nanoTime();
                     float[] prediction = cnn.predict(floatArray);
                     long endTime = System.nanoTime();
-                    System.out.println("\nPrediction completed in " + (endTime - startTime) / 1_000_000 + " ms");
+                    System.out.println("Prediction: " + Arrays.toString(prediction));
 
-                    int gridSize = 4;
-                    int featuresPerCell = 36;
+                    System.out.println("\nPrediction completed in " + (endTime - startTime) / 1_000_000 + " ms");
 
                     for (int cellY = 0; cellY < gridSize; cellY++) {
                         for (int cellX = 0; cellX < gridSize; cellX++) {
@@ -116,7 +119,7 @@ public class WebcamTest {
                             float confidence = prediction[startIdx];
 
                             // confidence threshold is 50%
-                            if (confidence > 0.5f) {
+                            if (confidence > 0.2f) {
                                 float relX = prediction[startIdx + 1];
                                 float relY = prediction[startIdx + 2];
                                 float w = prediction[startIdx + 3];
@@ -131,6 +134,8 @@ public class WebcamTest {
                                 System.out.println("Fruit: " + fruits[max]);
 
                                 overlay.updatePosition(pixelX, pixelY, fruits[max] + " " + Math.round(classProbs[max] * 100 * 10.0) / 10.0 + "%");
+                            } else {
+                                overlay.updatePosition(-1000, -1000, "");
                             }
 
                         }

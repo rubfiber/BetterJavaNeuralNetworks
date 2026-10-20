@@ -47,7 +47,7 @@ public class trainCNN {
         cnn.addDataGrids("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f, 0.4f, Color.WHITE);
 
         System.out.println("Beginning Training on " + cnn.outputs.length + " samples...");
-        cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.01f, 32, 10);
+        cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.001f, 32, 10);
 
         System.out.println("Network trained successfully!");
 

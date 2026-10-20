@@ -807,8 +807,8 @@ public class ConvolutionalNetwork {
                     outputs[i][startIdx + 2] = (normalCenterY * gridSize) - cellY;
 
                     // width and height
-                    outputs[i][startIdx + 3] = 1.0f;
-                    outputs[i][startIdx + 4] = 1.0f;
+                    outputs[i][startIdx + 3] = 0.4f;
+                    outputs[i][startIdx + 4] = 0.4f;
 
                     outputs[i][startIdx + 5 + classIndex] = 1.0f;
                 }
