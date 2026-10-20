@@ -104,24 +104,42 @@ public class WebcamTest {
                     long startTime = System.nanoTime();
                     float[] prediction = cnn.predict(floatArray);
                     long endTime = System.nanoTime();
-
                     System.out.println("\nPrediction completed in " + (endTime - startTime) / 1_000_000 + " ms");
-                    System.out.println("Output (Softmax Probabilities): " + Arrays.toString(prediction));
 
-                    int max = util.getIndexOfMax(Arrays.copyOfRange(prediction, 0, fruits.length));
-                    System.out.println("Fruit: " + fruits[max]);
-                    System.out.println("Output: " + Arrays.toString(prediction));
-                    float[] pos = (Arrays.copyOfRange(prediction, fruits.length, prediction.length));
-                    System.out.println("Normalized pos: " + Arrays.toString(pos));
+                    int gridSize = 4;
+                    int featuresPerCell = 36;
 
-                    int pixelX = (int) (pos[0] * 640);
-                    int pixelY = (int) (pos[1] * 480);
+                    for (int cellY = 0; cellY < gridSize; cellY++) {
+                        for (int cellX = 0; cellX < gridSize; cellX++) {
+                            int startIdx = ((cellY * gridSize) + cellX) * featuresPerCell;
 
-                    overlay.updatePosition(pixelX, pixelY, fruits[max] + " " + Math.round(prediction[max] * 100 * 10.0) / 10.0 + "%");
-                }
+                            float confidence = prediction[startIdx];
+
+                            // confidence threshold is 50%
+                            if (confidence > 0.5f) {
+                                float relX = prediction[startIdx + 1];
+                                float relY = prediction[startIdx + 2];
+                                float w = prediction[startIdx + 3];
+                                float h = prediction[startIdx + 4];
+
+                                int pixelX = (int) (((cellX + relX) / gridSize) * 640);
+                                int pixelY = (int) (((cellY + relY) / gridSize) * 480);
+
+                                float[] classProbs = Arrays.copyOfRange(prediction, startIdx + 5, startIdx + 5 + fruits.length);
+
+                                int max = util.getIndexOfMax(classProbs);
+                                System.out.println("Fruit: " + fruits[max]);
+
+                                overlay.updatePosition(pixelX, pixelY, fruits[max] + " " + Math.round(classProbs[max] * 100 * 10.0) / 10.0 + "%");
+                            }
+
+                        }
+                        }
+                    }
 
                 try { Thread.sleep(33); } catch (InterruptedException e) { break; }
             }
         }).start();
     }
 }
+

@@ -29,6 +29,7 @@ public class ConvolutionalNetwork {
     public ConvolutionalLayer[] cnnLayers;
     public FeedForwardNetwork network;
     public int[] filters;
+    public int gridSize = 4;
 
 
     public ConvolutionalNetwork(filterBuilder builder, int[] FFNLayers, int[] filters, int[] inputChannels, int[] stride) {
@@ -43,7 +44,7 @@ public class ConvolutionalNetwork {
 
         cnnLayers = new ConvolutionalLayer[filters.length];
         for (int i = 0; i < filters.length; i++) {
-            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, 3);
+            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, gridSize = gridSize,3);
         }
     }
 
@@ -178,14 +179,16 @@ public class ConvolutionalNetwork {
         float[][] lastInputColumn;
         float[][][] lastOutput;
         int numFilters;
+        int gridSize;
 
-        public ConvolutionalLayer(int inChannels, int numFilters, int stride, int[] padding, int kernelSize) {
+        public ConvolutionalLayer(int inChannels, int numFilters, int stride, int[] padding, int gridSize, int kernelSize) {
             this.numFilters = numFilters;
             this.stride = stride;
             this.padding = padding;
             this.weights = new float[numFilters][inChannels][3][3];
             this.biases = new float[numFilters];
             this.kernelSize = kernelSize;
+            this.gridSize = gridSize;
 
 
             float stdDev = (float) Math.sqrt(2.0 / (inChannels * filterSize * filterSize));
@@ -629,7 +632,7 @@ public class ConvolutionalNetwork {
                     .filter(path -> path.toString().matches(".*\\.(png|jpg|jpeg|gif|bmp)$"))
                     .toArray(Path[]::new);
         } catch (IOException e) {
-            log.error("Failed to walk directory: ", e);
+            log.error("Failed to scan directory: ", e);
             return;
         }
 
@@ -638,7 +641,7 @@ public class ConvolutionalNetwork {
             return;
         }
 
-        System.out.println("Loaded " + imagePaths.length + " image paths into queue.");
+        System.out.println("queueing " + imagePaths.length + " images");
 
         floatImages = new float[imagePaths.length][3][targetSize][targetSize];
         outputs = new float[imagePaths.length][possibleAnswers.length];
@@ -660,7 +663,7 @@ public class ConvolutionalNetwork {
                 }
             }
             if (!matchFound) {
-                System.err.println("Warning: File '" + fileName + "' does not match any answers. Defaulting to 0s.");
+                System.err.println(fileName + "' does not match any answers. Defaulting to 0");
             }
 
             try {
@@ -678,6 +681,137 @@ public class ConvolutionalNetwork {
                 int shiftY = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
                 imagePos[i][0] = 0.5f + ((float) shiftX / targetSize);
                 imagePos[i][1] = 0.5f + ((float) shiftY / targetSize);
+                g2d.drawImage(rawImg, shiftX, shiftY, targetSize, targetSize, null);
+                g2d.dispose();
+
+                // change color of image slightly
+                float bFactor = (rand.nextFloat() * 2f - 1f) * brightnessRange;
+                float cFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * contrastRange;
+                float sFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * saturationRange;
+
+                // rgb bitwise
+                for (int y = 0; y < targetSize; y++) {
+                    for (int x = 0; x < targetSize; x++) {
+                        int pixel = canvas.getRGB(x, y);
+
+                        float red   = ((pixel >> 16) & 0xFF) / 255.0f;
+                        float green = ((pixel >> 8)  & 0xFF) / 255.0f;
+                        float blue  = (pixel         & 0xFF) / 255.0f;
+
+                        // brightness for variation
+                        red   += bFactor;
+                        green += bFactor;
+                        blue  += bFactor;
+
+                        // contrast
+                        red   = (red   - 0.5f) * cFactor + 0.5f;
+                        green = (green - 0.5f) * cFactor + 0.5f;
+                        blue  = (blue  - 0.5f) * cFactor + 0.5f;
+
+                        // saturation
+                        float gray = 0.299f * red + 0.587f * green + 0.114f * blue;
+                        red   = gray + (red   - gray) * sFactor;
+                        green = gray + (green - gray) * sFactor;
+                        blue  = gray + (blue  - gray) * sFactor;
+
+                        floatImages[i][0][y][x] = Math.clamp(red, 0.0f, 1.0f);
+                        floatImages[i][1][y][x] = Math.clamp(green, 0.0f, 1.0f);
+                        floatImages[i][2][y][x] = Math.clamp(blue, 0.0f, 1.0f);
+                    }
+                }
+
+            } catch (IOException e) {
+                log.error("Failed to process image: {}", path, e);
+            }
+        }
+    }
+
+    public void addDataGrids(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange, float shiftRange, Color imgBackgroundColor) {
+
+        if (shiftRange != 0) {
+            network.setOutputActivationWithIndex(network.outputSize-1, Activation.SIGMOID);
+            network.setOutputActivationWithIndex(network.outputSize-2, Activation.SIGMOID); // for X and Y since they're different from the classification prediction
+        }
+        Path[] imagePaths;
+
+        // find all image files
+        try (var stream = Files.walk(Paths.get(dirPath))) {
+            imagePaths = stream
+                    .filter(Files::isRegularFile)
+                    .filter(path -> path.toString().matches(".*\\.(png|jpg|jpeg|gif|bmp)$"))
+                    .toArray(Path[]::new);
+        } catch (IOException e) {
+            log.error("Failed to scan directory: ", e);
+            return;
+        }
+
+        if (imagePaths.length == 0) {
+            System.out.println("No images found in " + dirPath);
+            return;
+        }
+
+        System.out.println("queueing " + imagePaths.length + " images");
+
+        floatImages = new float[imagePaths.length][3][targetSize][targetSize];
+
+        int featuresPerCell = 1 + 4 + possibleAnswers.length;
+
+        outputs = new float[imagePaths.length][gridSize * gridSize * featuresPerCell];
+
+        Random rand = new Random();
+        int maxShiftPixels = Math.round(targetSize * shiftRange);
+
+        for (int i = 0; i < imagePaths.length; i++) {
+            Path path = imagePaths[i];
+            String fileName = path.getFileName().toString().toLowerCase();
+
+            int classIndex = -1;
+            for (int j = 0; j < possibleAnswers.length; j++) {
+                if (fileName.contains(possibleAnswers[j].toLowerCase())) {
+                    classIndex = j;
+                    break;
+                }
+            }
+            if (classIndex == -1) {
+                System.err.println(fileName + "' does not match any answers. Defaulting to 0");
+            }
+
+            try {
+                BufferedImage rawImg = ImageIO.read(path.toFile());
+                if (rawImg == null) continue;
+
+                BufferedImage canvas = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = canvas.createGraphics();
+
+                // background color
+                g2d.setColor(imgBackgroundColor);
+                g2d.fillRect(0, 0, targetSize, targetSize);
+
+                int shiftX = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
+                int shiftY = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
+                float normalCenterX = 0.5f + ((float) shiftX / targetSize);
+                float normalCenterY = 0.5f + ((float) shiftY / targetSize);
+                normalCenterX = Math.clamp(normalCenterX, 0.001f, 0.999f);
+                normalCenterY = Math.clamp(normalCenterY, 0.001f, 0.999f);
+
+                int cellX = (int) (normalCenterX * gridSize);
+                int cellY = (int) (normalCenterY * gridSize);
+
+                int cellIndex = (cellY * gridSize) + cellX;
+                int startIdx = cellIndex * featuresPerCell;
+                if (classIndex != -1) {
+                    outputs[i][startIdx] = 1.0f; // 1. Confidence score
+
+                    // relative grid cell bounding boxes for x and y
+                    outputs[i][startIdx + 1] = (normalCenterX * gridSize) - cellX;
+                    outputs[i][startIdx + 2] = (normalCenterY * gridSize) - cellY;
+
+                    // width and height
+                    outputs[i][startIdx + 3] = 1.0f;
+                    outputs[i][startIdx + 4] = 1.0f;
+
+                    outputs[i][startIdx + 5 + classIndex] = 1.0f;
+                }
                 g2d.drawImage(rawImg, shiftX, shiftY, targetSize, targetSize, null);
                 g2d.dispose();
 

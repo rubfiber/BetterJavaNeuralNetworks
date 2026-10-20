@@ -56,6 +56,10 @@ public class util {
 
         return flatArray;
     }
+    public static float getIndexAt(float[] input, int x, int y, int z, int width, int height) {
+        return x + (y * width) + (z * width * height);
+
+    }
 
     public static float[][] deFlatten(float[] matrix, int[] key) {
         return deFlattenItems(matrix, key);
