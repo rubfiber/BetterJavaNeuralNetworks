@@ -1,6 +1,6 @@
 package org.example.Usage;
 
-import org.network.Dataset;
+import org.network.util.Dataset;
 import org.network.FeedForward.Activation;
 import org.network.FeedForward.FeedForwardNetwork;
 

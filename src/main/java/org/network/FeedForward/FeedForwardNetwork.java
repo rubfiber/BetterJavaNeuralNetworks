@@ -1,8 +1,8 @@
 package org.network.FeedForward;
 
-import org.network.Dataset;
+import org.network.util.Dataset;
 import org.network.neuron.Neuron;
-import org.network.util;
+import org.network.util.util;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
 import java.io.*;

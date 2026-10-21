@@ -1,4 +1,4 @@
-package org.network;
+package org.network.util;
 
 import java.util.ArrayList;
 import java.util.Arrays;

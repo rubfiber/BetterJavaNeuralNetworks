@@ -1,9 +1,6 @@
 package org.network.FeedForward;
 
-import org.network.Dataset;
-
-import java.io.File;
-import java.nio.file.Path;
+import org.network.util.Dataset;
 
 public interface Network {
 

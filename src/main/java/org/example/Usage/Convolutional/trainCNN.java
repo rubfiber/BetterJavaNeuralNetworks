@@ -2,7 +2,7 @@ package org.example.Usage.Convolutional;
 
 import org.network.Convolutional.ConvolutionalNetwork;
 import org.network.FeedForward.Activation;
-import org.network.util;
+import org.network.util.util;
 
 import javax.imageio.ImageIO;
 import java.awt.*;

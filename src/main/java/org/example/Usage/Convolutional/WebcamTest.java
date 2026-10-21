@@ -2,16 +2,13 @@ package org.example.Usage.Convolutional;
 
 import com.github.sarxos.webcam.Webcam;
 import com.github.sarxos.webcam.WebcamPanel;
-import com.github.sarxos.webcam.WebcamResolution;
 import org.network.Convolutional.ConvolutionalNetwork;
 import org.network.FeedForward.Activation;
-import org.network.util;
+import org.network.util.util;
 
-import javax.imageio.ImageIO;
 import javax.swing.*;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.io.File;
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -40,8 +37,7 @@ public class WebcamTest {
         int[] ffnLayers = {2304, 256, totalOutputs};
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
 
-        cnn.network.setOutputActivationWithIndex(cnn.network.outputSize - 1, Activation.SIGMOID);
-        cnn.network.setOutputActivationWithIndex(cnn.network.outputSize - 2, Activation.SIGMOID);
+        cnn.network.fillOutputActivation(Activation.SIGMOID);
         cnn.loadState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
 
         int channels = 3;
@@ -119,7 +115,7 @@ public class WebcamTest {
                             float confidence = prediction[startIdx];
 
                             // confidence threshold is 50%
-                            if (confidence > 0.2f) {
+                            if (confidence > 0.5f) {
                                 float relX = prediction[startIdx + 1];
                                 float relY = prediction[startIdx + 2];
                                 float w = prediction[startIdx + 3];

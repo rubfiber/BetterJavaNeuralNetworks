@@ -1,4 +1,4 @@
-package org.network;
+package org.network.util;
 
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
