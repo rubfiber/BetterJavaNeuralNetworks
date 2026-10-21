@@ -2,7 +2,7 @@ package org.network.Convolutional;
 
 import org.network.FeedForward.Activation;
 import org.network.FeedForward.FeedForwardNetwork;
-import org.network.util;
+import org.network.util.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -16,7 +16,7 @@ import java.nio.file.Paths;
 
 import java.util.Random;
 
-import static org.network.util.*;
+import static org.network.util.util.*;
 
 public class ConvolutionalNetwork {
 
@@ -129,8 +129,40 @@ public class ConvolutionalNetwork {
                 }
             }
             System.out.println("Epoch: " + epoch);
+            if (useYoloLoss) printDiagnostics(imageInputs, desiredOutputs, 100);
         }
 
+    }
+    public boolean useYoloLoss = true;
+
+    public void printDiagnostics(float[][][][] images, float[][] targets, int maxSamples) { //just for diagnostics (Claude made this)
+        int cells = gridSize * gridSize;
+        int fpc = targets[0].length / cells;
+        int n = Math.min(maxSamples, images.length);
+        double loss = 0, confAtObj = 0, confEmpty = 0;
+        int objSamples = 0, cellHits = 0;
+
+        for (int s = 0; s < n; s++) {
+            int idx = (int) ((long) s * images.length / n);
+            float[] pred = predict(images[idx]);
+            float[] t = targets[idx];
+
+            int bestCell = 0, trueCell = -1;
+            float bestConf = -1;
+            for (int c = 0; c < cells; c++) {
+                int base = c * fpc;
+                if (pred[base] > bestConf) { bestConf = pred[base]; bestCell = c; }
+                if (t[base] > 0.5f) { trueCell = c; confAtObj += pred[base]; }
+                else confEmpty += pred[base];
+            }
+            for (int k = 0; k < pred.length; k++) { double d = pred[k] - t[k]; loss += d * d; }
+            if (trueCell >= 0) { objSamples++; if (bestCell == trueCell) cellHits++; }
+        }
+        System.out.printf("   loss %.4f | conf@object %.3f | conf@empty %.3f | right cell %d/%d%n",
+                loss / n,
+                objSamples > 0 ? confAtObj / objSamples : 0,
+                confEmpty / Math.max(1, n * cells - objSamples),
+                cellHits, objSamples);
     }
 
     private float[][][] unflattenError(float[] flatError1D, int numFilters, int height, int width) {
