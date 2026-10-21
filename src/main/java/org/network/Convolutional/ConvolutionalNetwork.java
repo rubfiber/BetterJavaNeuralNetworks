@@ -2,6 +2,7 @@ package org.network.Convolutional;
 
 import org.network.FeedForward.Activation;
 import org.network.FeedForward.FeedForwardNetwork;
+import org.network.FeedForward.Network;
 import org.network.util.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,7 @@ import java.util.Random;
 
 import static org.network.util.util.*;
 
-public class ConvolutionalNetwork {
+public class ConvolutionalNetwork{
 
     private static final Logger log = LoggerFactory.getLogger(ConvolutionalNetwork.class);
     //filter size is 3x3 to avoid 6 nested loops
@@ -44,7 +45,7 @@ public class ConvolutionalNetwork {
 
         cnnLayers = new ConvolutionalLayer[filters.length];
         for (int i = 0; i < filters.length; i++) {
-            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, gridSize = gridSize,3);
+            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, gridSize,3);
         }
     }
 
@@ -72,7 +73,24 @@ public class ConvolutionalNetwork {
     int lastCnnHeight;
     int lastCnnWidth;
     int lastCnnFilters;
+    private static final float COORD_WEIGHT = 5f, NOOBJ_WEIGHT = 0.2f;
 
+    private float[] yoloWeights(float[] target) {
+        int cells = gridSize * gridSize;
+        int fpc = target.length / cells;
+        float[] w = new float[target.length];
+        for (int c = 0; c < cells; c++) {
+            int s = c * fpc;
+            if (target[s] > 0.5f) {
+                w[s] = 1f;
+                for (int k = 1; k <= 4; k++) w[s + k] = COORD_WEIGHT;
+                for (int k = 5; k < fpc; k++) w[s + k] = 1f;
+            } else {
+                w[s] = NOOBJ_WEIGHT;
+            }
+        }
+        return w;
+    }
     public void train(float[][][] image, float[] desiredOutput) {
         float[][][] cnnOutput = forwardPass(image);
         int lastNumFilters = cnnOutput.length;         // depth/channels
@@ -85,6 +103,15 @@ public class ConvolutionalNetwork {
 
 
         float[] flatData = util.flatten3D(cnnOutput);
+        float[] targetForFfn = desiredOutput;
+        if (useYoloLoss) {
+            float[] w = yoloWeights(desiredOutput);
+            float[] out = network.predict(flatData);
+            targetForFfn = new float[desiredOutput.length];
+            for (int i = 0; i < out.length; i++) {
+                targetForFfn[i] = out[i] - w[i] * (out[i] - desiredOutput[i]);
+            }
+        }
         float[] flatError1D = network.accumulateGradientsForCnn(flatData, desiredOutput);
         float[][][] current3DError = unflattenError(flatError1D, lastNumFilters, lastHeight, lastWidth);
         for (int layer = cnnLayers.length - 1; layer >= 0; layer--) {
@@ -154,6 +181,10 @@ public class ConvolutionalNetwork {
                 if (pred[base] > bestConf) { bestConf = pred[base]; bestCell = c; }
                 if (t[base] > 0.5f) { trueCell = c; confAtObj += pred[base]; }
                 else confEmpty += pred[base];
+            }
+            int predClass = 0, trueClass = 0;
+            for (int k = 1; k < fpc - 4; k++) {
+                if (pred[trueCell * fpc + 4 + k] > pred[trueCell * fpc + 4 + predClass + 1 - 1 + 0 * k] ) { }
             }
             for (int k = 0; k < pred.length; k++) { double d = pred[k] - t[k]; loss += d * d; }
             if (trueCell >= 0) { objSamples++; if (bestCell == trueCell) cellHits++; }
@@ -943,7 +974,6 @@ public class ConvolutionalNetwork {
                         for (int c = 0; c < inChannels; c++) {
                             for (int y = 0; y < fHeight; y++) {
                                 for (int x = 0; x < fWidth; x++) {
-                                    // Overwrite the random initial weights with the trained ones
                                     layer.weights[f][c][y][x] = dis.readFloat();
                                 }
                             }

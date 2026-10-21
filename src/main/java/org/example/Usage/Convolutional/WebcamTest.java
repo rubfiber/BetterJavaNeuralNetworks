@@ -42,8 +42,8 @@ public class WebcamTest {
 
         int channels = 3;
 
-       // Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video3"); //Logitech
-        Webcam webcam =  Webcam.getDefault();
+        Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video2"); //Logitech
+        //Webcam webcam =  Webcam.getDefault(); //my built in webcam
         webcam.setViewSize(new Dimension(640, 480));
         webcam.open();
 
@@ -108,33 +108,32 @@ public class WebcamTest {
 
                     System.out.println("\nPrediction completed in " + (endTime - startTime) / 1_000_000 + " ms");
 
-                    for (int cellY = 0; cellY < gridSize; cellY++) {
-                        for (int cellX = 0; cellX < gridSize; cellX++) {
-                            int startIdx = ((cellY * gridSize) + cellX) * featuresPerCell;
-
-                            float confidence = prediction[startIdx];
-
-                            // confidence threshold is 50%
-                            if (confidence > 0.5f) {
-                                float relX = prediction[startIdx + 1];
-                                float relY = prediction[startIdx + 2];
-                                float w = prediction[startIdx + 3];
-                                float h = prediction[startIdx + 4];
-
-                                int pixelX = (int) (((cellX + relX) / gridSize) * 640);
-                                int pixelY = (int) (((cellY + relY) / gridSize) * 480);
-
-                                float[] classProbs = Arrays.copyOfRange(prediction, startIdx + 5, startIdx + 5 + fruits.length);
-
-                                int max = util.getIndexOfMax(classProbs);
-                                System.out.println("Fruit: " + fruits[max]);
-
-                                overlay.updatePosition(pixelX, pixelY, fruits[max] + " " + Math.round(classProbs[max] * 100 * 10.0) / 10.0 + "%");
-                            } else {
-                                overlay.updatePosition(-1000, -1000, "");
+                        float bestConf = 0f;
+                        int bestIdx = -1, bestCX = 0, bestCY = 0;
+                        for (int cellY = 0; cellY < gridSize; cellY++) {
+                            for (int cellX = 0; cellX < gridSize; cellX++) {
+                                int startIdx = ((cellY * gridSize) + cellX) * featuresPerCell;
+                                if (prediction[startIdx] > bestConf) {
+                                    bestConf = prediction[startIdx];
+                                    bestIdx = startIdx;
+                                    bestCX = cellX;
+                                    bestCY = cellY;
+                                }
                             }
-
                         }
+
+                        if (bestConf > 0.25f) {
+                            float[] classProbs = Arrays.copyOfRange(prediction, bestIdx + 5, bestIdx + 5 + fruits.length);
+                            int max = util.getIndexOfMax(classProbs);
+
+                            int pixelX = 640 - (int) (((bestCX + prediction[bestIdx + 1]) / gridSize) * 640); // un-mirror
+                            int pixelY = (int) (((bestCY + prediction[bestIdx + 2]) / gridSize) * 480);
+
+                            String label = fruits[max] + " " + Math.round(classProbs[max] * 1000) / 10.0 + "% (conf "
+                                    + Math.round(bestConf * 100) + "%)";
+                            SwingUtilities.invokeLater(() -> overlay.updatePosition(pixelX - 200, pixelY - 200, label));
+                        } else {
+                            SwingUtilities.invokeLater(() -> overlay.updatePosition(-1000, -1000, ""));
                         }
                     }
 

@@ -97,7 +97,7 @@ public class trainCNN {
             }
         }
 
-        if (bestConfidence > 0.5f) { // confidence threshhold: 50%
+        if (bestConfidence > 0.25f) { // confidence threshhold: 50%
             float relX = prediction[bestCellStartIdx + 1];
             float relY = prediction[bestCellStartIdx + 2];
             float boxW = prediction[bestCellStartIdx + 3];
@@ -106,7 +106,6 @@ public class trainCNN {
             // converting to normalized cell coordinates
             float finalNormalizedX = (bestCellX + relX) / gridSize;
             float finalNormalizedY = (bestCellY + relY) / gridSize;
-
             float[] classProbs = Arrays.copyOfRange(prediction, bestCellStartIdx + 5, bestCellStartIdx + featuresPerCell);
             int classIndex = util.getIndexOfMax(classProbs);
 
