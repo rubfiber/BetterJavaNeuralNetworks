@@ -104,6 +104,7 @@ public class FeedForwardNetwork implements Network, Neuron {
             float derivative = 1.0f;
 
             if (outputActivations[i] == Activation.SIGMOID) {
+
                 int k = featuresPerCell > 0 ? i % featuresPerCell : -1;
                 boolean isBox = k >= 1 && k <= 4;
                 derivative = (featuresPerCell > 0 && !isBox) ? 1.0f : out * (1.0f - out);

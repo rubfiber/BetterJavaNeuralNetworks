@@ -242,7 +242,7 @@ public class util {
     }
 
     public static float leakyRelu(float output) {
-        return relu(output);
+        return output > 0 ? output : 0.01f * output;
     }
     public static float linear(float output) {return output;}
 
@@ -256,7 +256,6 @@ public class util {
         if (minCh(im.getRGB(x, y)) >= 235) { bg[y * w + x] = true; q.add(y * w + x); }
     }
 
-    /** Returns an ARGB copy of src with the border-connected white made transparent. */
     public static BufferedImage keyOutWhite(BufferedImage src) {
         int w = src.getWidth(), h = src.getHeight();
         boolean[] bg = new boolean[w * h];
@@ -269,7 +268,7 @@ public class util {
             seedBg(src, bg, q, x, y - 1); seedBg(src, bg, q, x, y + 1);
         }
 
-        final int erode = 1;                    // raise to 2 if a fringe remains
+        final int erode = 1;
         for (int it = 0; it < erode; it++) {
             boolean[] next = bg.clone();
             for (int y = 0; y < h; y++)

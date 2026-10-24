@@ -114,7 +114,7 @@ public class ConvolutionalNetwork {
                 targetForFfn[i] = out[i] - w[i] * (out[i] - desiredOutput[i]);
             }
         }
-        float[] flatError1D = network.accumulateGradientsForCnn(flatData, desiredOutput);
+        float[] flatError1D = network.accumulateGradientsForCnn(flatData, targetForFfn);
         float[][][] current3DError = unflattenError(flatError1D, lastNumFilters, lastHeight, lastWidth);
         for (int layer = cnnLayers.length - 1; layer >= 0; layer--) {
             if ((layer + 1) % 2 == 0) { //backprop pooling happens in the same place as forward pass
@@ -680,11 +680,11 @@ public class ConvolutionalNetwork {
             String fileName = path.getFileName().toString().toLowerCase();
 
             boolean matchFound = false;
-            for (int j = 0; j < possibleAnswers.length; j++) {
-                if (fileName.contains(possibleAnswers[j].toLowerCase())) {
-                    outputs[i][j] = 1.0f;
-                    matchFound = true;
-                    break;
+            int bestMatchLength = -1;
+            for (String possibleAnswer : possibleAnswers) {
+                String candidate = possibleAnswer.toLowerCase();
+                if (fileName.contains(candidate) && candidate.length() > bestMatchLength) {
+                    bestMatchLength = candidate.length();
                 }
             }
             if (!matchFound) {
@@ -833,7 +833,6 @@ public class ConvolutionalNetwork {
         outputs = new float[imagePaths.length][gridSize * gridSize * featuresPerCell];
 
         Random rand = new Random();
-        int maxShiftPixels = Math.round(targetSize * shiftRange);
 
         for (int i = 0; i < imagePaths.length; i++) {
             Path path = imagePaths[i];
