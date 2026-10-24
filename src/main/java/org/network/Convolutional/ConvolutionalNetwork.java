@@ -2,7 +2,6 @@ package org.network.Convolutional;
 
 import org.network.FeedForward.Activation;
 import org.network.FeedForward.FeedForwardNetwork;
-import org.network.FeedForward.Network;
 import org.network.util.util;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,11 +14,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 import static org.network.util.util.*;
 
-public class ConvolutionalNetwork{
+public class ConvolutionalNetwork {
 
     private static final Logger log = LoggerFactory.getLogger(ConvolutionalNetwork.class);
     //filter size is 3x3 to avoid 6 nested loops
@@ -45,7 +46,7 @@ public class ConvolutionalNetwork{
 
         cnnLayers = new ConvolutionalLayer[filters.length];
         for (int i = 0; i < filters.length; i++) {
-            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, gridSize,3);
+            cnnLayers[i] = new ConvolutionalLayer(inputChannels[i], filters[i], stride[i], this.padding, gridSize, 3);
         }
     }
 
@@ -73,7 +74,7 @@ public class ConvolutionalNetwork{
     int lastCnnHeight;
     int lastCnnWidth;
     int lastCnnFilters;
-    private static final float COORD_WEIGHT = 5f, NOOBJ_WEIGHT = 0.2f;
+    private static final float COORD_WEIGHT = 2f, NOOBJ_WEIGHT = 0.2f;
 
     private float[] yoloWeights(float[] target) {
         int cells = gridSize * gridSize;
@@ -91,6 +92,7 @@ public class ConvolutionalNetwork{
         }
         return w;
     }
+
     public void train(float[][][] image, float[] desiredOutput) {
         float[][][] cnnOutput = forwardPass(image);
         int lastNumFilters = cnnOutput.length;         // depth/channels
@@ -160,40 +162,80 @@ public class ConvolutionalNetwork{
         }
 
     }
+
     public boolean useYoloLoss = true;
 
-    public void printDiagnostics(float[][][][] images, float[][] targets, int maxSamples) { //just for diagnostics (Claude made this)
+    public void printDiagnostics(float[][][][] images, float[][] targets, int maxSamples) {
         int cells = gridSize * gridSize;
-        int fpc = targets[0].length / cells;
+        int fpc = targets[0].length / cells;      // features per cell
+        int nCls = fpc - 5;                       // class slots per cell
         int n = Math.min(maxSamples, images.length);
+
         double loss = 0, confAtObj = 0, confEmpty = 0;
-        int objSamples = 0, cellHits = 0;
+        double trueClassProb = 0, topClassProb = 0;
+        int objSamples = 0, cellHits = 0, nearHits = 0, classHits = 0;
 
         for (int s = 0; s < n; s++) {
-            int idx = (int) ((long) s * images.length / n);
+            int idx = (int) ((long) s * images.length / n);   // spread across the dataset
             float[] pred = predict(images[idx]);
             float[] t = targets[idx];
 
-            int bestCell = 0, trueCell = -1;
-            float bestConf = -1;
+            // overall loss (unweighted squared error)
+            for (int k = 0; k < pred.length; k++) {
+                double d = pred[k] - t[k];
+                loss += d * d;
+            }
+
+            // find the true cell and the most confident predicted cell
+            int trueCell = -1, bestCell = 0;
+            float bestConf = -1f;
             for (int c = 0; c < cells; c++) {
                 int base = c * fpc;
-                if (pred[base] > bestConf) { bestConf = pred[base]; bestCell = c; }
-                if (t[base] > 0.5f) { trueCell = c; confAtObj += pred[base]; }
-                else confEmpty += pred[base];
+                if (pred[base] > bestConf) {
+                    bestConf = pred[base];
+                    bestCell = c;
+                }
+                if (t[base] > 0.5f) {
+                    trueCell = c;
+                    confAtObj += pred[base];
+                } else {
+                    confEmpty += pred[base];
+                }
             }
+            if (trueCell < 0) continue;   // unlabeled sample (no object target)
+
+            objSamples++;
+
+            // localization
+            if (bestCell == trueCell) cellHits++;
+            int dx = Math.abs(bestCell % gridSize - trueCell % gridSize);
+            int dy = Math.abs(bestCell / gridSize - trueCell / gridSize);
+            if (Math.max(dx, dy) <= 1) nearHits++;
+
+            // classification at the true cell (independent of localization)
+            int cb = trueCell * fpc + 5;
             int predClass = 0, trueClass = 0;
-            for (int k = 1; k < fpc - 4; k++) {
-                if (pred[trueCell * fpc + 4 + k] > pred[trueCell * fpc + 4 + predClass + 1 - 1 + 0 * k] ) { }
+            for (int k = 1; k < nCls; k++) {
+                if (pred[cb + k] > pred[cb + predClass]) predClass = k;
+                if (t[cb + k] > t[cb + trueClass]) trueClass = k;
             }
-            for (int k = 0; k < pred.length; k++) { double d = pred[k] - t[k]; loss += d * d; }
-            if (trueCell >= 0) { objSamples++; if (bestCell == trueCell) cellHits++; }
+            if (predClass == trueClass) classHits++;
+            trueClassProb += pred[cb + trueClass];
+            topClassProb += pred[cb + predClass];
         }
-        System.out.printf("   loss %.4f | conf@object %.3f | conf@empty %.3f | right cell %d/%d%n",
+
+        int emptyCells = Math.max(1, n * cells - objSamples);
+        int o = Math.max(1, objSamples);
+        System.out.printf(
+                "   loss %.4f | conf@object %.3f | conf@empty %.3f | cell %d/%d (within 1: %d) | "
+                        + "class %d/%d (chance %.0f%%) | p(true class) %.3f | p(top class) %.3f%n",
                 loss / n,
-                objSamples > 0 ? confAtObj / objSamples : 0,
-                confEmpty / Math.max(1, n * cells - objSamples),
-                cellHits, objSamples);
+                confAtObj / o,
+                confEmpty / emptyCells,
+                cellHits, objSamples, nearHits,
+                classHits, objSamples, 100.0 / nCls,
+                trueClassProb / o,
+                topClassProb / o);
     }
 
     private float[][][] unflattenError(float[] flatError1D, int numFilters, int height, int width) {
@@ -578,86 +620,6 @@ public class ConvolutionalNetwork{
             return padded;
         }
 
-        public float[][][] slideOverImage(int[][] image) {
-            int width = image.length;
-            int height = image[0].length;
-            int outHeight = (height - 3 + padding[1]) / stride + 1;
-            int outWidth = (width - 3 + padding[0]) / stride + 1;
-
-            float[][][] nextLayerInput = new float[weights.length][outHeight][outWidth];
-
-            for (int filter = 0; filter < weights.length; filter++) {
-                float bias = biases[filter];
-                float[][][] currentWeights = weights[filter];
-
-                int outY = 0;
-                for (int y = Math.floorDiv(padding[1], 2); y < height - 1 && outY < outHeight; y += stride) {
-                    int outX = 0;
-                    for (int x = Math.floorDiv(padding[0], 2); x < width - 1 && outX < outWidth; x += stride) {
-
-                        float sum = 0f;
-                        for (int filterX = x - 1; filterX <= x + 1; filterX++) {
-                            for (int filterY = y + 1; filterY >= y - 1; filterY--) {
-
-                                float r = (float) (((image[filterX][filterY] >> 16) & 0xFF) / 255.0);
-                                float g = (float) (((image[filterX][filterY] >> 8) & 0xFF) / 255.0);
-                                float b = (float) ((image[filterX][filterY] & 0xFF) / 255.0);
-
-                                sum += r * currentWeights[0][filterX - x + 1][filterY - y + 1];
-                                sum += g * currentWeights[1][filterX - x + 1][filterY - y + 1];
-                                sum += b * currentWeights[2][filterX - x + 1][filterY - y + 1];
-                            }
-                        }
-
-                        float finalPixel = sum + bias;
-                        nextLayerInput[filter][outY][outX] = (finalPixel > 0 ? finalPixel : finalPixel * 0.01f);
-                        outX++;
-                    }
-                    outY++;
-                }
-            }
-            return nextLayerInput;
-        }
-
-        public float[][][] slideOverFeatureMap(float[][][] map) { //must be padded
-
-            int height = map[0].length;
-            int width = map[0][0].length;
-
-            int outHeight = (height - 3 + padding[1]) / stride + 1;
-            int outWidth = (width - 3 + padding[0]) / stride + 1;
-
-            float[][][] nextLayerInput = new float[weights.length][outHeight][outWidth];
-
-            for (int filter = 0; filter < weights.length; filter++) {
-                float bias = biases[filter];
-
-                int outY = 0;
-                for (int y = 1; y < height - 1 && outY < outHeight; y += stride) {
-                    int outX = 0;
-                    for (int x = 1; x < width - 1 && outX < outWidth; x += stride) {
-
-                        float sum = 0f;
-                        for (int c = 0; c < 3; c++) {
-                            for (int filterX = x - 1; filterX <= x + 1; filterX++) {
-                                for (int filterY = y - 1; filterY <= y + 1; filterY++) {
-
-                                    float val = map[c][filterY][filterX];
-                                    sum += val * weights[filter][c][filterY - y + 1][filterX - x + 1];
-                                }
-                            }
-                        }
-
-                        float finalPixel = sum + bias;
-                        nextLayerInput[filter][outY][outX] = (finalPixel > 0 ? finalPixel : finalPixel * 0.01f);
-                        outX++;
-                    }
-                    outY++;
-                }
-            }
-            return nextLayerInput;
-        }
-
         public float[][][][] getWeights() {
             return weights;
         }
@@ -683,8 +645,8 @@ public class ConvolutionalNetwork{
     public void addData(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange, float shiftRange, Color imgBackgroundColor) {
 
         if (shiftRange != 0) {
-            network.setOutputActivationWithIndex(network.outputSize-1, Activation.SIGMOID);
-            network.setOutputActivationWithIndex(network.outputSize-2, Activation.SIGMOID); // for X and Y since they're different from the classification prediction
+            network.setOutputActivationWithIndex(network.outputSize - 1, Activation.SIGMOID);
+            network.setOutputActivationWithIndex(network.outputSize - 2, Activation.SIGMOID); // for X and Y since they're different from the classification prediction
         }
         Path[] imagePaths;
 
@@ -757,25 +719,25 @@ public class ConvolutionalNetwork{
                     for (int x = 0; x < targetSize; x++) {
                         int pixel = canvas.getRGB(x, y);
 
-                        float red   = ((pixel >> 16) & 0xFF) / 255.0f;
-                        float green = ((pixel >> 8)  & 0xFF) / 255.0f;
-                        float blue  = (pixel         & 0xFF) / 255.0f;
+                        float red = ((pixel >> 16) & 0xFF) / 255.0f;
+                        float green = ((pixel >> 8) & 0xFF) / 255.0f;
+                        float blue = (pixel & 0xFF) / 255.0f;
 
                         // brightness for variation
-                        red   += bFactor;
+                        red += bFactor;
                         green += bFactor;
-                        blue  += bFactor;
+                        blue += bFactor;
 
                         // contrast
-                        red   = (red   - 0.5f) * cFactor + 0.5f;
+                        red = (red - 0.5f) * cFactor + 0.5f;
                         green = (green - 0.5f) * cFactor + 0.5f;
-                        blue  = (blue  - 0.5f) * cFactor + 0.5f;
+                        blue = (blue - 0.5f) * cFactor + 0.5f;
 
                         // saturation
                         float gray = 0.299f * red + 0.587f * green + 0.114f * blue;
-                        red   = gray + (red   - gray) * sFactor;
+                        red = gray + (red - gray) * sFactor;
                         green = gray + (green - gray) * sFactor;
-                        blue  = gray + (blue  - gray) * sFactor;
+                        blue = gray + (blue - gray) * sFactor;
 
                         floatImages[i][0][y][x] = Math.clamp(red, 0.0f, 1.0f);
                         floatImages[i][1][y][x] = Math.clamp(green, 0.0f, 1.0f);
@@ -789,11 +751,60 @@ public class ConvolutionalNetwork{
         }
     }
 
+    public List<BufferedImage> bgFrames = new ArrayList<>();
+    private static final float X_SQUASH = 0.75f;   // 640x480 -> square makes round things 25% narrower; use h/w of your real frames
+
+    public void loadBackgrounds(String dir) {
+        try (var stream = Files.walk(Paths.get(dir))) {
+            for (Path p : stream.filter(Files::isRegularFile)
+                    .filter(x -> x.toString().toLowerCase().matches(".*\\.(png|jpg|jpeg)$")).toList()) {
+                BufferedImage im = ImageIO.read(p.toFile());
+                if (im != null) bgFrames.add(im);
+            }
+        } catch (IOException e) {
+            System.err.println("Could not load backgrounds: " + e.getMessage());
+        }
+        System.out.println("Loaded " + bgFrames.size() + " background frames");
+    }
+
+    private static BufferedImage cropToContent(BufferedImage im) {
+        int w = im.getWidth(), h = im.getHeight(), x0 = w, y0 = h, x1 = -1, y1 = -1;
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+                if ((im.getRGB(x, y) >>> 24) > 40) {
+                    x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y);
+                }
+        return x1 < 0 ? null : im.getSubimage(x0, y0, x1 - x0 + 1, y1 - y0 + 1);
+    }
+
+    private BufferedImage makeBackground(int size, Random rand) {
+        BufferedImage bg = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+        if (!bgFrames.isEmpty() && rand.nextFloat() < 0.8f) {
+            BufferedImage src = bgFrames.get(rand.nextInt(bgFrames.size()));
+            float s = 0.5f + rand.nextFloat() * 0.5f;
+            int cw = Math.round(src.getWidth() * s), ch = Math.round(src.getHeight() * s);
+            int x = rand.nextInt(src.getWidth() - cw + 1), y = rand.nextInt(src.getHeight() - ch + 1);
+            boolean flip = rand.nextBoolean();
+            Graphics2D g = bg.createGraphics();
+            g.drawImage(src, flip ? size : 0, 0, flip ? 0 : size, size, x, y, x + cw, y + ch, null);
+            g.dispose();
+        } else {
+            int base = 70 + rand.nextInt(160), grain = rand.nextInt(6);
+            float[] blot = lowFreqTexture(size, 3 + rand.nextInt(4), 8 + rand.nextInt(16), rand);
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++) {
+                    int lum = Math.clamp(Math.round(base + blot[y * size + x] + rand.nextInt(grain * 2 + 1) - grain), 0, 255);
+                    bg.setRGB(x, y, (lum << 16) | (lum << 8) | lum);
+                }
+        }
+        return bg;
+    }
+
     public void addDataGrids(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange, float shiftRange, Color imgBackgroundColor) {
 
         if (shiftRange != 0) {
-            network.setOutputActivationWithIndex(network.outputSize-1, Activation.SIGMOID);
-            network.setOutputActivationWithIndex(network.outputSize-2, Activation.SIGMOID); // for X and Y since they're different from the classification prediction
+            network.setOutputActivationWithIndex(network.outputSize - 1, Activation.SIGMOID);
+            network.setOutputActivationWithIndex(network.outputSize - 2, Activation.SIGMOID); // for X and Y since they're different from the classification prediction
         }
         Path[] imagePaths;
 
@@ -843,71 +854,77 @@ public class ConvolutionalNetwork{
                 BufferedImage rawImg = ImageIO.read(path.toFile());
                 if (rawImg == null) continue;
 
-                BufferedImage canvas = new BufferedImage(targetSize, targetSize, BufferedImage.TYPE_INT_RGB);
+                BufferedImage canvas = makeBackground(targetSize, rand);
+                BufferedImage fruit = cropToContent(keyOutWhite(rawImg));
+                if (fruit == null) continue;
+
+                float scale = 0.25f + rand.nextFloat() * 0.65f;
+                float effW = fruit.getWidth() * X_SQUASH, effH = fruit.getHeight();
+                float k = scale * targetSize / Math.max(effW, effH);
+                int dw = Math.max(4, Math.round(effW * k)), dh = Math.max(4, Math.round(effH * k));
+                int dx = rand.nextInt(targetSize - dw + 1), dy = rand.nextInt(targetSize - dh + 1);
+                boolean flip = rand.nextBoolean();
+
                 Graphics2D g2d = canvas.createGraphics();
-
-                // background color
-                g2d.setColor(imgBackgroundColor);
-                g2d.fillRect(0, 0, targetSize, targetSize);
-
-                int shiftX = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
-                int shiftY = (maxShiftPixels > 0) ? rand.nextInt(maxShiftPixels * 2 + 1) - maxShiftPixels : 0;
-                float normalCenterX = 0.5f + ((float) shiftX / targetSize);
-                float normalCenterY = 0.5f + ((float) shiftY / targetSize);
-                normalCenterX = Math.clamp(normalCenterX, 0.001f, 0.999f);
-                normalCenterY = Math.clamp(normalCenterY, 0.001f, 0.999f);
-
-                int cellX = (int) (normalCenterX * gridSize);
-                int cellY = (int) (normalCenterY * gridSize);
-
-                int cellIndex = (cellY * gridSize) + cellX;
-                int startIdx = cellIndex * featuresPerCell;
-                if (classIndex != -1) {
-                    outputs[i][startIdx] = 1.0f; // 1. Confidence score
-
-                    // relative grid cell bounding boxes for x and y
-                    outputs[i][startIdx + 1] = (normalCenterX * gridSize) - cellX;
-                    outputs[i][startIdx + 2] = (normalCenterY * gridSize) - cellY;
-
-                    // width and height
-                    outputs[i][startIdx + 3] = 0.4f;
-                    outputs[i][startIdx + 4] = 0.4f;
-
-                    outputs[i][startIdx + 5 + classIndex] = 1.0f;
-                }
-                g2d.drawImage(rawImg, shiftX, shiftY, targetSize, targetSize, null);
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                if (flip) g2d.drawImage(fruit, dx + dw, dy, -dw, dh, null);
+                else      g2d.drawImage(fruit, dx, dy, dw, dh, null);
                 g2d.dispose();
 
+                float cx = (dx + dw / 2f) / targetSize, cy = (dy + dh / 2f) / targetSize;
+                int cellX = Math.min(gridSize - 1, (int) (cx * gridSize));
+                int cellY = Math.min(gridSize - 1, (int) (cy * gridSize));
+                int startIdx = (cellY * gridSize + cellX) * featuresPerCell;
+                if (classIndex != -1) {
+                    outputs[i][startIdx]     = 1f;
+                    outputs[i][startIdx + 1] = cx * gridSize - cellX;
+                    outputs[i][startIdx + 2] = cy * gridSize - cellY;
+                    outputs[i][startIdx + 3] = dw / (float) targetSize;
+                    outputs[i][startIdx + 4] = dh / (float) targetSize;
+                    outputs[i][startIdx + 5 + classIndex] = 1f;
+                }
                 // change color of image slightly
                 float bFactor = (rand.nextFloat() * 2f - 1f) * brightnessRange;
                 float cFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * contrastRange;
-                float sFactor = 1.0f + (rand.nextFloat() * 2f - 1f) * saturationRange;
+                float sFactor = 0.25f + rand.nextFloat() * 1.15f;
 
+                float rGain = 1f + (rand.nextFloat() * 2f - 1f) * 0.15f;
+                float gGain = 1f + (rand.nextFloat() * 2f - 1f) * 0.10f;
+                float bGain = 1f + (rand.nextFloat() * 2f - 1f) * 0.20f;
+                float noise = rand.nextFloat() * 0.04f;
                 // rgb bitwise
                 for (int y = 0; y < targetSize; y++) {
                     for (int x = 0; x < targetSize; x++) {
                         int pixel = canvas.getRGB(x, y);
 
-                        float red   = ((pixel >> 16) & 0xFF) / 255.0f;
-                        float green = ((pixel >> 8)  & 0xFF) / 255.0f;
-                        float blue  = (pixel         & 0xFF) / 255.0f;
+                        float red = ((pixel >> 16) & 0xFF) / 255.0f;
+                        float green = ((pixel >> 8) & 0xFF) / 255.0f;
+                        float blue = (pixel & 0xFF) / 255.0f;
 
-                        // brightness for variation
-                        red   += bFactor;
+                        red *= rGain;
+                        green *= gGain;
+                        blue *= bGain;
+
+                        // brightness variation
+                        red += bFactor;
                         green += bFactor;
-                        blue  += bFactor;
+                        blue += bFactor;
 
                         // contrast
-                        red   = (red   - 0.5f) * cFactor + 0.5f;
+                        red = (red - 0.5f) * cFactor + 0.5f;
                         green = (green - 0.5f) * cFactor + 0.5f;
-                        blue  = (blue  - 0.5f) * cFactor + 0.5f;
+                        blue = (blue - 0.5f) * cFactor + 0.5f;
 
                         // saturation
                         float gray = 0.299f * red + 0.587f * green + 0.114f * blue;
-                        red   = gray + (red   - gray) * sFactor;
+                        red = gray + (red - gray) * sFactor;
                         green = gray + (green - gray) * sFactor;
-                        blue  = gray + (blue  - gray) * sFactor;
+                        blue = gray + (blue - gray) * sFactor;
 
+
+                        red += (float) rand.nextGaussian() * noise;
+                        green += (float) rand.nextGaussian() * noise;
+                        blue += (float) rand.nextGaussian() * noise;
                         floatImages[i][0][y][x] = Math.clamp(red, 0.0f, 1.0f);
                         floatImages[i][1][y][x] = Math.clamp(green, 0.0f, 1.0f);
                         floatImages[i][2][y][x] = Math.clamp(blue, 0.0f, 1.0f);
@@ -920,6 +937,55 @@ public class ConvolutionalNetwork{
         }
     }
 
+    public void saveSamples(String outDir, String[] names, int count) {
+        File dir = new File(outDir);
+        dir.mkdirs();
+        Random r = new Random();
+        int cells = gridSize * gridSize;
+        int fpc = outputs[0].length / cells;
+
+        for (int n = 0; n < Math.min(count, floatImages.length); n++) {
+            int i = r.nextInt(floatImages.length);
+            int size = floatImages[i][0].length;
+
+            BufferedImage img = new BufferedImage(size, size, BufferedImage.TYPE_INT_RGB);
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    int rr = Math.round(floatImages[i][0][y][x] * 255f);
+                    int gg = Math.round(floatImages[i][1][y][x] * 255f);
+                    int bb = Math.round(floatImages[i][2][y][x] * 255f);
+                    img.setRGB(x, y, (rr << 16) | (gg << 8) | bb);
+                }
+            }
+
+            // label for the filename, so mislabeled samples are obvious
+            String label = "NOLABEL";
+            for (int c = 0; c < cells; c++) {
+                if (outputs[i][c * fpc] > 0.5f) {
+                    int best = 0;
+                    for (int k = 1; k < fpc - 5; k++) {
+                        if (outputs[i][c * fpc + 5 + k] > outputs[i][c * fpc + 5 + best]) best = k;
+                    }
+                    label = names[best].replace(' ', '_') + "_cell" + c;
+                    break;
+                }
+            }
+
+            // 4x nearest-neighbor upscale so the pixels stay visible
+            BufferedImage big = new BufferedImage(size * 4, size * 4, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g = big.createGraphics();
+            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            g.drawImage(img, 0, 0, size * 4, size * 4, null);
+            g.dispose();
+
+            try {
+                ImageIO.write(big, "png", new File(dir, "sample" + n + "_" + label + ".png"));
+            } catch (IOException e) {
+                System.err.println("Could not save sample: " + e.getMessage());
+            }
+        }
+        System.out.println("Wrote samples to " + dir.getAbsolutePath());
+    } //debug
     public void saveState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) {
         try (DataOutputStream dos = new DataOutputStream(new FileOutputStream(CNNFilePath))) {
             dos.writeInt(cnnLayers.length);
@@ -955,7 +1021,7 @@ public class ConvolutionalNetwork{
 
     public void loadState(String CNNFilePath, String FFNWeightsPath, String FFNBiasPath) throws IOException {
         try (DataInputStream dis = new DataInputStream(new FileInputStream(CNNFilePath))) {
-            int numLayers =  dis.readInt();
+            int numLayers = dis.readInt();
             if (numLayers != cnnLayers.length) {
                 System.err.println("Invalid number of layers: " + numLayers);
             }
@@ -965,27 +1031,26 @@ public class ConvolutionalNetwork{
                 for (int b = 0; b < numBiases; b++) {
                     layer.biases[b] = dis.readFloat();
                 }
-                    int numFilters = dis.readInt();
-                    int inChannels = dis.readInt();
-                    int fHeight = dis.readInt();
-                    int fWidth = dis.readInt();
+                int numFilters = dis.readInt();
+                int inChannels = dis.readInt();
+                int fHeight = dis.readInt();
+                int fWidth = dis.readInt();
 
-                    for (int f = 0; f < numFilters; f++) {
-                        for (int c = 0; c < inChannels; c++) {
-                            for (int y = 0; y < fHeight; y++) {
-                                for (int x = 0; x < fWidth; x++) {
-                                    layer.weights[f][c][y][x] = dis.readFloat();
-                                }
+                for (int f = 0; f < numFilters; f++) {
+                    for (int c = 0; c < inChannels; c++) {
+                        for (int y = 0; y < fHeight; y++) {
+                            for (int x = 0; x < fWidth; x++) {
+                                layer.weights[f][c][y][x] = dis.readFloat();
                             }
                         }
                     }
                 }
+            }
+            network.loadWeights(FFNWeightsPath);
+            network.loadBias(FFNBiasPath);
 
         } catch (IOException e) {
             System.err.println("Failed to load model: " + e.getMessage());
         }
-
-        network.loadBias(FFNBiasPath);
-        network.loadWeights(FFNWeightsPath);
     }
 }

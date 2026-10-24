@@ -42,9 +42,11 @@ public class trainCNN {
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
 
         cnn.network.fillOutputActivation(Activation.SIGMOID);
-
+        cnn.network.featuresPerCell = featuresPerCell;
         // instead of add data I use add data grids since I am using yolo-style grid splitting
         cnn.addDataGrids("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f, 0.4f, Color.WHITE);
+
+        cnn.saveSamples("Data/", fruits, 10);
 
         System.out.println("Beginning Training on " + cnn.outputs.length + " samples...");
         cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.001f, 32, 10);

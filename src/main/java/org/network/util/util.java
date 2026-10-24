@@ -2,7 +2,9 @@ package org.network.util;
 
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
+import java.awt.image.BufferedImage;
 import java.util.List;
+import java.util.Random;
 import java.util.stream.IntStream;
 
 public class util {
@@ -243,4 +245,73 @@ public class util {
         return relu(output);
     }
     public static float linear(float output) {return output;}
+
+    private static int minCh(int p) {
+        return Math.min((p >> 16) & 0xFF, Math.min((p >> 8) & 0xFF, p & 0xFF));
+    }
+
+    private static void seedBg(BufferedImage im, boolean[] bg, java.util.ArrayDeque<Integer> q, int x, int y) {
+        int w = im.getWidth(), h = im.getHeight();
+        if (x < 0 || y < 0 || x >= w || y >= h || bg[y * w + x]) return;
+        if (minCh(im.getRGB(x, y)) >= 235) { bg[y * w + x] = true; q.add(y * w + x); }
+    }
+
+    /** Returns an ARGB copy of src with the border-connected white made transparent. */
+    public static BufferedImage keyOutWhite(BufferedImage src) {
+        int w = src.getWidth(), h = src.getHeight();
+        boolean[] bg = new boolean[w * h];
+        java.util.ArrayDeque<Integer> q = new java.util.ArrayDeque<>();
+        for (int x = 0; x < w; x++) { seedBg(src, bg, q, x, 0); seedBg(src, bg, q, x, h - 1); }
+        for (int y = 0; y < h; y++) { seedBg(src, bg, q, 0, y); seedBg(src, bg, q, w - 1, y); }
+        while (!q.isEmpty()) {
+            int p = q.poll(), x = p % w, y = p / w;
+            seedBg(src, bg, q, x - 1, y); seedBg(src, bg, q, x + 1, y);
+            seedBg(src, bg, q, x, y - 1); seedBg(src, bg, q, x, y + 1);
+        }
+
+        final int erode = 1;                    // raise to 2 if a fringe remains
+        for (int it = 0; it < erode; it++) {
+            boolean[] next = bg.clone();
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++) {
+                    int idx = y * w + x;
+                    if (bg[idx]) continue;
+                    if ((x > 0 && bg[idx - 1]) || (x < w - 1 && bg[idx + 1])
+                            || (y > 0 && bg[idx - w]) || (y < h - 1 && bg[idx + w])) next[idx] = true;
+                }
+            bg = next;
+        }
+
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < h; y++) {
+            for (int x = 0; x < w; x++) {
+                int idx = y * w + x;
+                if (bg[idx]) { out.setRGB(x, y, 0); continue; }
+                boolean ring = (x > 0 && bg[idx - 1]) || (x < w - 1 && bg[idx + 1])
+                        || (y > 0 && bg[idx - w]) || (y < h - 1 && bg[idx + w]);
+                int alpha = ring ? 170 : 255;   // slightly soft outer edge, like a camera
+                out.setRGB(x, y, (alpha << 24) | (src.getRGB(x, y) & 0xFFFFFF));
+            }
+        }
+        return out;
+    }
+    public static float[] lowFreqTexture(int n, int cells, float amp, Random rand) {
+        float[][] grid = new float[cells + 1][cells + 1];
+        for (float[] row : grid) for (int j = 0; j < row.length; j++) row[j] = (rand.nextFloat() * 2f - 1f) * amp;
+        float[] out = new float[n * n];
+        for (int y = 0; y < n; y++) {
+            float fy = (float) y / (n - 1) * cells;
+            int iy = Math.min((int) fy, cells - 1);
+            float ty = fy - iy;
+            for (int x = 0; x < n; x++) {
+                float fx = (float) x / (n - 1) * cells;
+                int ix = Math.min((int) fx, cells - 1);
+                float tx = fx - ix;
+                float top = grid[iy][ix] * (1 - tx) + grid[iy][ix + 1] * tx;
+                float bot = grid[iy + 1][ix] * (1 - tx) + grid[iy + 1][ix + 1] * tx;
+                out[y * n + x] = top * (1 - ty) + bot * ty;
+            }
+        }
+        return out;
+    }
 }

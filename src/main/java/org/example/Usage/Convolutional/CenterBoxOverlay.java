@@ -4,20 +4,17 @@ import javax.swing.JComponent;
 import java.awt.*;
 
 public class CenterBoxOverlay extends JComponent {
-    private final int boxSize;
+    private int boxX;
+    private int boxY;
+
     private String predictionText = "";
-    public CenterBoxOverlay(int boxSize) {
-        this.boxSize = boxSize;
+    public CenterBoxOverlay(int boxX, int boxY) {
+        this.boxX = boxY;
+        this.boxY = boxY;
         setOpaque(false);
     }
     int centerX = 0;
     int centerY = 0;
-    public CenterBoxOverlay(int boxSize, int x, int y) {
-        this.boxSize = boxSize;
-        this.centerX = x;
-        this.centerY = y;
-        setOpaque(false);
-    }
 
     @Override
     protected void paintComponent(Graphics g) {
@@ -31,8 +28,8 @@ public class CenterBoxOverlay extends JComponent {
         int startX;
         int startY;
         if (centerX == 0 && centerY == 0) {
-             startX = (width - boxSize) / 2;
-             startY = (height - boxSize) / 2;
+             startX = (width - boxX) / 2;
+             startY = (height - boxY) / 2;
 
         } else {
              startX =  centerX;
@@ -42,7 +39,7 @@ public class CenterBoxOverlay extends JComponent {
         // bounding box
         g2d.setColor(Color.GREEN);
         g2d.setStroke(new BasicStroke(3)); //3px thickness
-        g2d.drawRect(startX, startY, boxSize, boxSize);
+        g2d.drawRect(startX, startY, boxX, boxY);
 
         // crosshair
         g2d.setStroke(new BasicStroke(1));
@@ -66,5 +63,11 @@ public class CenterBoxOverlay extends JComponent {
         this.centerY = y;
         this.predictionText = text;
         this.repaint();
+    }
+
+    public void updateBox(int x, int y, int w, int h, String text) {
+        this.centerX = x; this.centerY = y; this.boxX = w; this.boxY = h;
+        this.predictionText = text;
+        repaint();
     }
 }

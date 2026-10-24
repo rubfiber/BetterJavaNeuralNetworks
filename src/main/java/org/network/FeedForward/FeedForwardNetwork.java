@@ -86,7 +86,7 @@ public class FeedForwardNetwork implements Network, Neuron {
 
 
     }
-
+    public int featuresPerCell = 0;
     /**
      *
      * @param desiredOutputs The target outputs, which is what you expect the network to return
@@ -104,7 +104,9 @@ public class FeedForwardNetwork implements Network, Neuron {
             float derivative = 1.0f;
 
             if (outputActivations[i] == Activation.SIGMOID) {
-                derivative = out * (1.0f - out);
+                int k = featuresPerCell > 0 ? i % featuresPerCell : -1;
+                boolean isBox = k >= 1 && k <= 4;
+                derivative = (featuresPerCell > 0 && !isBox) ? 1.0f : out * (1.0f - out);
             } else if (outputActivations[i] == Activation.TANH) {
                 derivative = 1.0f - (out * out);
             }
@@ -336,7 +338,7 @@ public class FeedForwardNetwork implements Network, Neuron {
         }
         this.hiddenActivations[layerIndex] = activations;
     }
-    private void refreshSoftmaxOutput() { //after changing output activations, softmax can
+    private void refreshSoftmaxOutput() {
         softmaxIndices = IntStream.range(0, outputActivations.length)
                 .filter(i -> Objects.equals(outputActivations[i], Activation.SOFTMAX))
                 .toArray();

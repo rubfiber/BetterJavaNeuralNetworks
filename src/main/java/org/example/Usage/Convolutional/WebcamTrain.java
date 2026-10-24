@@ -84,7 +84,7 @@ public class WebcamTrain {
         panel.setMirrored(true);
         panel.setBounds(0, 0, 640, 480);
 
-        CenterBoxOverlay overlay = new CenterBoxOverlay(CROP_SIZE);
+        CenterBoxOverlay overlay = new CenterBoxOverlay(CROP_SIZE, CROP_SIZE);
         overlay.setBounds(0, 0, 640, 480);
 
         JLayeredPane layeredPane = new JLayeredPane();
