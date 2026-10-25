@@ -4,6 +4,7 @@ import com.github.sarxos.webcam.Webcam;
 import com.github.sarxos.webcam.WebcamPanel;
 import org.network.Convolutional.ConvolutionalNetwork;
 import org.network.FeedForward.Activation;
+import org.network.util.AppFiles;
 import org.network.util.util;
 
 import javax.swing.*;
@@ -40,7 +41,9 @@ public class WebcamTest {
         ConvolutionalNetwork cnn = new ConvolutionalNetwork(builder, ffnLayers, cnnFilters, cnnInputChannels, cnnStrides);
 
         cnn.network.fillOutputActivation(Activation.SIGMOID);
-        cnn.loadState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
+        cnn.loadState(AppFiles.resourceToTempFile("/model/CNNState.bin"),
+                AppFiles.resourceToTempFile("/model/FFNWeights.bin"),
+                AppFiles.resourceToTempFile("/model/FFNBias.bin")); // because it might break when using a jar
         int channels = 3;
 
         Webcam webcam = Webcam.getWebcamByName(LOGITECH_C270);

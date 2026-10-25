@@ -3,6 +3,7 @@ package org.example.Usage.Convolutional;
 import com.github.sarxos.webcam.Webcam;
 import com.github.sarxos.webcam.WebcamPanel;
 import org.jspecify.annotations.NonNull;
+import org.network.util.AppFiles;
 
 import javax.imageio.ImageIO;
 import javax.swing.*;
@@ -15,12 +16,11 @@ import java.io.IOException;
 
 public class WebcamTrain {
 
-    private static final String SAVE_DIRECTORY = "src/main/resources/captured_images";
     private static final int CROP_SIZE = 400;
     private static String FILE_NAME = "Strawberry";
 
-    public static void main(String[] args) {
-        File outputFolder = new File(SAVE_DIRECTORY);
+    public static void main(String[] args) throws IOException {
+        File outputFolder = AppFiles.userDir("captured_images").toFile();
         if (!outputFolder.exists()) {
             outputFolder.mkdirs();
         }

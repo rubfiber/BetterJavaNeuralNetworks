@@ -1,3 +1,5 @@
+// I made base and claude added jpackage stuff (like 75% of it)
+
 plugins {
     id 'java-library'
 }
@@ -19,9 +21,108 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     implementation 'io.github.beehive-lab:tornado-api:5.0.0-jdk25'
     implementation 'com.github.sarxos:webcam-capture:0.3.12'
-    implementation 'com.github.sarxos:webcam-capture:0.3.12'
 }
 
 test {
     useJUnitPlatform()
+}
+
+// ---------------------------------------------------------------------------
+// jpackage: native executable/installer for the OS Gradle is running on
+//
+//   ./gradlew jpackage                           -> exe (Windows), dmg (macOS), deb (Linux)
+//   ./gradlew jpackage -PpackageType=app-image   -> plain app folder, no extra tools needed
+//   other types: msi, pkg, rpm
+//
+// jpackage cannot cross-compile: run it once on each OS.
+// Output lands in build/jpackage/output/
+// ---------------------------------------------------------------------------
+
+def appName       = 'FruitDetector'            // no spaces: Linux package names can't contain them
+def appVersionStr = '1.0.0'                    // numeric only; macOS rejects a leading 0, so not '0.5'
+def appMainClass  = 'org.example.Usage.Main'
+def jvmOptions    = ['-Xmx2g', '--enable-native-access=ALL-UNNAMED']                 // passed to the packaged app's JVM
+
+def osName    = System.getProperty('os.name').toLowerCase()
+def isWindows = osName.contains('win')
+def isMac     = osName.contains('mac')
+def isLinux   = !isWindows && !isMac
+
+// Use the same JDK 25 toolchain that compiles the code, so the runtime bundled
+// into the app matches the class files (otherwise: UnsupportedClassVersionError).
+def toolchainHome = javaToolchains.launcherFor(java.toolchain)
+        .map { it.metadata.installationPath.asFile }
+
+// Gather the project jar plus every runtime dependency into one folder for jpackage.
+tasks.register('jpackageInput', Copy) {
+    dependsOn tasks.named('jar')
+    from tasks.named('jar')
+    from configurations.runtimeClasspath
+    into layout.buildDirectory.dir('jpackage/input')
+}
+
+tasks.register('jpackage', Exec) {
+    group = 'distribution'
+    description = 'Builds a native executable/installer for the OS Gradle is running on'
+    dependsOn 'jpackageInput'
+
+    def inputDir  = layout.buildDirectory.dir('jpackage/input')
+    def outputDir = layout.buildDirectory.dir('jpackage/output')
+    def jarName   = tasks.named('jar').flatMap { it.archiveFileName }
+
+    doFirst {
+        def type = project.findProperty('packageType') ?: (isWindows ? 'exe' : isMac ? 'dmg' : 'deb')
+        def out  = outputDir.get().asFile
+        delete out
+
+        def jpackageBin = new File(toolchainHome.get(), "bin/jpackage${isWindows ? '.exe' : ''}")
+
+        def args = [
+                jpackageBin.path,
+                '--type', type.toString(),
+                '--name', appName,
+                '--app-version', appVersionStr,
+                '--input', inputDir.get().asFile.path,
+                '--main-jar', jarName.get(),
+                '--main-class', appMainClass,
+                '--dest', out.path
+        ]
+
+        jvmOptions.each { args.addAll(['--java-options', it]) }
+
+        // Optional icon: packaging/icon.ico (Windows), icon.icns (macOS), icon.png (Linux)
+        def icon = file("packaging/icon.${isWindows ? 'ico' : isMac ? 'icns' : 'png'}")
+        if (icon.exists()) args.addAll(['--icon', icon.path])
+
+        if (type != 'app-image') {
+            if (isWindows) args.addAll(['--win-menu', '--win-shortcut'])
+            if (isLinux)   args.addAll(['--linux-shortcut', '--linux-package-name', appName.toLowerCase()])
+        }
+
+        commandLine args
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Keep training/capture images out of the jar: they would bloat the app, and
+// Files.walk() can't read a directory inside a jar anyway.
+// ---------------------------------------------------------------------------
+processResources {
+    exclude 'train/**', 'captured_images/**'
+}
+
+// Dev tools: run these from the project folder, not from the packaged app.
+//   ./gradlew trainCNN      retrains and writes the model files
+//   ./gradlew webcamTrain   captures training images with the space bar
+tasks.register('trainCNN', JavaExec) {
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.example.Usage.Convolutional.trainCNN'
+    // maxHeapSize = '4g'   // raise this if training runs out of memory
+}
+
+tasks.register('webcamTrain', JavaExec) {
+    group = 'application'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.example.Usage.Convolutional.WebcamTrain'
 }
