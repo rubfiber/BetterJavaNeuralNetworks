@@ -255,7 +255,6 @@ public class FeedForwardNetwork implements Network, Neuron {
         return derivative;
     }
 
-
     /**
      *
      * @param learningRate How quickly the network should train - too high, and it might overshoot but too low, and it might not adjust as much - you can tune this to whatever you like

@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.Arrays;
 
 public class WebcamTest {
+    private static final String WEBCAM_PATH = "/dev/video2";
+    private static final String LOGITECH_C270 ="C270 HD WEBCAM " + WEBCAM_PATH;
     public static void main(String[] args) throws IOException {
         String[] fruits = new String[]{"apple", "Apple Granny Smith",
                 "Apricot", "Avocado", "Banana", "Blueberry", "Cactus fruit",
@@ -40,8 +42,9 @@ public class WebcamTest {
         cnn.network.fillOutputActivation(Activation.SIGMOID);
         cnn.loadState("src/main/java/org/example/Convolutional/CNNState.bin", "src/main/java/org/example/Convolutional/FFNWeights.bin", "src/main/java/org/example/Convolutional/FFNBias.bin");
         int channels = 3;
-        
-        Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video2"); //Logitech
+
+        Webcam webcam = Webcam.getWebcamByName(LOGITECH_C270);
+        //Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video2"); //Logitech
         //Webcam webcam =  Webcam.getDefault(); //my built in webcam
         //webcam.setViewSize(new Dimension(640, 480));
         webcam.open();
@@ -53,7 +56,8 @@ public class WebcamTest {
 
         panel.setBounds(0, 0, 640, 480);
 
-        JFrame window = new JFrame("Java Webcam Viewer");
+        JFrame window = new JFrame("CNN Test");
+
         window.setResizable(false);
         window.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -130,6 +134,7 @@ public class WebcamTest {
                             String label = fruits[max] + " " + Math.round(classProbs[max] * 1000) / 10.0 + "% (conf "
                                     + Math.round(bestConf * 100) + "%)";
                             int bw = Math.round(prediction[bestIdx + 3] * 640), bh = Math.round(prediction[bestIdx + 4] * 480);
+                            //best cell
                             SwingUtilities.invokeLater(() -> overlay.updateBox(pixelX - bw / 2, pixelY - bh / 2, bw, bh, label));
                         } else {
                             SwingUtilities.invokeLater(() -> overlay.updatePosition(-1000, -1000, ""));

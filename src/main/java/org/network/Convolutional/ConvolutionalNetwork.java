@@ -753,20 +753,9 @@ public class ConvolutionalNetwork {
     }
 
     public List<BufferedImage> bgFrames = new ArrayList<>();
-    private static final float X_SQUASH = 0.75f;   // 640x480 -> square makes round things 25% narrower; use h/w of your real frames
+    private static final float X_SQUASH = 0.75f;
 
-    public void loadBackgrounds(String dir) {
-        try (var stream = Files.walk(Paths.get(dir))) {
-            for (Path p : stream.filter(Files::isRegularFile)
-                    .filter(x -> x.toString().toLowerCase().matches(".*\\.(png|jpg|jpeg)$")).toList()) {
-                BufferedImage im = ImageIO.read(p.toFile());
-                if (im != null) bgFrames.add(im);
-            }
-        } catch (IOException e) {
-            System.err.println("Could not load backgrounds: " + e.getMessage());
-        }
-        System.out.println("Loaded " + bgFrames.size() + " background frames");
-    }
+
 
     private static BufferedImage cropToContent(BufferedImage im) {
         int w = im.getWidth(), h = im.getHeight(), x0 = w, y0 = h, x1 = -1, y1 = -1;
@@ -801,7 +790,7 @@ public class ConvolutionalNetwork {
         return bg;
     }
 
-    public void addDataGrids(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float saturationRange, float shiftRange, Color imgBackgroundColor) {
+    public void addDataGrids(String dirPath, String[] possibleAnswers, int targetSize, float brightnessRange, float contrastRange, float shiftRange, boolean keyOutWhite) {
 
         if (shiftRange != 0) {
             network.setOutputActivationWithIndex(network.outputSize - 1, Activation.SIGMOID);
@@ -848,7 +837,7 @@ public class ConvolutionalNetwork {
                 if (rawImg == null) continue;
 
                 BufferedImage canvas = makeBackground(targetSize, rand);
-                BufferedImage fruit = cropToContent(keyOutWhite(rawImg));
+                BufferedImage fruit = cropToContent((keyOutWhite) ? keyOutWhite(rawImg) : rawImg);
                 if (fruit == null) continue;
 
                 float scale = 0.25f + rand.nextFloat() * 0.65f;
@@ -968,7 +957,6 @@ public class ConvolutionalNetwork {
                 }
             }
 
-            // label for the filename, so mislabeled samples are obvious
             String label = "NOLABEL";
             for (int c = 0; c < cells; c++) {
                 if (outputs[i][c * fpc] > 0.5f) {

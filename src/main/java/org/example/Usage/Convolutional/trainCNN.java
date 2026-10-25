@@ -12,7 +12,7 @@ import java.io.IOException;
 import java.util.Arrays;
 
 public class trainCNN {
-    public static void main(String[] args) throws IOException {
+    static void main() throws IOException {
 
         System.out.println("Building YOLO-style Convolutional Neural Network...");
 
@@ -45,7 +45,7 @@ public class trainCNN {
         cnn.network.featuresPerCell = featuresPerCell;
 
         // yolo
-        cnn.addDataGrids("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f, 0.4f, Color.WHITE);
+        cnn.addDataGrids("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f, false);
 
         cnn.saveSamples("Data/", fruits, 10);
 
