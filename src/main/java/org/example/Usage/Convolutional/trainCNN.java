@@ -35,7 +35,7 @@ public class trainCNN {
         int gridSize = 4;
         int numCells = gridSize * gridSize; // 16 cells
         int featuresPerCell = 1 + 4 + fruits.length; // 1 Confidence + 4 Box (x,y,w,h) + 33 Classes = 38
-        int totalOutputs = numCells * featuresPerCell; // 16 * 38 = 608 Output Neurons
+        int totalOutputs = numCells * featuresPerCell; // 16 * 38 = 608
 
         int[] ffnLayers = {2304, 256, totalOutputs};
 
@@ -43,13 +43,14 @@ public class trainCNN {
 
         cnn.network.fillOutputActivation(Activation.SIGMOID);
         cnn.network.featuresPerCell = featuresPerCell;
-        // instead of add data I use add data grids since I am using yolo-style grid splitting
+
+        // yolo
         cnn.addDataGrids("src/main/resources/train", fruits, 64, 0.2f, 0.3f, 0.4f, 0.4f, Color.WHITE);
 
         cnn.saveSamples("Data/", fruits, 10);
 
         System.out.println("Beginning Training on " + cnn.outputs.length + " samples...");
-        cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.001f, 32, 10);
+        cnn.trainDataset(cnn.floatImages, cnn.outputs, 0.01f, 32, 25);
 
         System.out.println("Network trained successfully!");
 

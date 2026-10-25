@@ -83,16 +83,17 @@ public class ConvolutionalNetwork {
         for (int c = 0; c < cells; c++) {
             int s = c * fpc;
             if (target[s] > 0.5f) {
-                w[s] = 1f;
+                w[s] = 2f;
                 for (int k = 1; k <= 4; k++) w[s + k] = COORD_WEIGHT;
-                for (int k = 5; k < fpc; k++) w[s + k] = 1f;
+                for (int k = 5; k < fpc; k++) {
+                    w[s + k] = (target[s + k] > 0.5f) ? 8.0f : 0.5f;
+                }
             } else {
                 w[s] = NOOBJ_WEIGHT;
             }
         }
         return w;
     }
-
     public void train(float[][][] image, float[] desiredOutput) {
         float[][][] cnnOutput = forwardPass(image);
         int lastNumFilters = cnnOutput.length;         // depth/channels
@@ -837,14 +838,7 @@ public class ConvolutionalNetwork {
         for (int i = 0; i < imagePaths.length; i++) {
             Path path = imagePaths[i];
             String fileName = path.getFileName().toString().toLowerCase();
-
-            int classIndex = -1;
-            for (int j = 0; j < possibleAnswers.length; j++) {
-                if (fileName.contains(possibleAnswers[j].toLowerCase())) {
-                    classIndex = j;
-                    break;
-                }
-            }
+            int classIndex = getClassIndex(possibleAnswers, path);
             if (classIndex == -1) {
                 System.err.println(fileName + "' does not match any answers. Defaulting to 0");
             }
@@ -867,7 +861,7 @@ public class ConvolutionalNetwork {
                 Graphics2D g2d = canvas.createGraphics();
                 g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
                 if (flip) g2d.drawImage(fruit, dx + dw, dy, -dw, dh, null);
-                else      g2d.drawImage(fruit, dx, dy, dw, dh, null);
+                else g2d.drawImage(fruit, dx, dy, dw, dh, null);
                 g2d.dispose();
 
                 float cx = (dx + dw / 2f) / targetSize, cy = (dy + dh / 2f) / targetSize;
@@ -875,7 +869,7 @@ public class ConvolutionalNetwork {
                 int cellY = Math.min(gridSize - 1, (int) (cy * gridSize));
                 int startIdx = (cellY * gridSize + cellX) * featuresPerCell;
                 if (classIndex != -1) {
-                    outputs[i][startIdx]     = 1f;
+                    outputs[i][startIdx] = 1f;
                     outputs[i][startIdx + 1] = cx * gridSize - cellX;
                     outputs[i][startIdx + 2] = cy * gridSize - cellY;
                     outputs[i][startIdx + 3] = dw / (float) targetSize;
@@ -934,6 +928,23 @@ public class ConvolutionalNetwork {
                 log.error("Failed to process image: {}", path, e);
             }
         }
+    }
+
+    private static int getClassIndex(String[] possibleAnswers, Path path) {
+        String fullName = (path.getParent() != null
+                ? path.getParent().getFileName().toString() + "_" + path.getFileName().toString()
+                : path.getFileName().toString()).toLowerCase();
+
+        int classIndex = -1;
+        int bestMatchLength = -1;
+        for (int j = 0; j < possibleAnswers.length; j++) {
+            String candidate = possibleAnswers[j].toLowerCase();
+            if (fullName.contains(candidate) && candidate.length() > bestMatchLength) {
+                classIndex = j;
+                bestMatchLength = candidate.length();
+            }
+        }
+        return classIndex;
     }
 
     public void saveSamples(String outDir, String[] names, int count) {
