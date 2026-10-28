@@ -12,11 +12,14 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
+
+import static org.example.Usage.Convolutional.getWebcam.getPreferredWebcam;
 
 public class WebcamTest {
     private static final String WEBCAM_PATH = "/dev/video2";
     private static final String LOGITECH_C270 ="C270 HD WEBCAM " + WEBCAM_PATH;
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws NoSuchElementException, IOException {
         String[] fruits = new String[]{"apple", "Apple Granny Smith",
                 "Apricot", "Avocado", "Banana", "Blueberry", "Cactus fruit",
                 "Cantaloupe", "Cherry", "Clementine", "Corn", "cucumber", "Grape Blue",
@@ -46,9 +49,9 @@ public class WebcamTest {
                 AppFiles.resourceToTempFile("/model/FFNBias.bin")); // because it might break when using a jar
         int channels = 3;
 
-        Webcam webcam = Webcam.getWebcamByName(LOGITECH_C270);
+       // Webcam webcam = Webcam.getWebcamByName(LOGITECH_C270);
         //Webcam webcam = Webcam.getWebcamByName("C270 HD WEBCAM /dev/video2"); //Logitech
-        //Webcam webcam =  Webcam.getDefault(); //my built in webcam
+        Webcam webcam =  getPreferredWebcam();
         //webcam.setViewSize(new Dimension(640, 480));
         webcam.open();
         System.out.println("Reading live RGB data. Press Ctrl+C to stop.");

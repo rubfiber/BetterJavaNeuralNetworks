@@ -157,3 +157,27 @@ cnn.loadState(
     "FFNBias.bin"
 );
 ```
+## Try it out
+### Linux X64 only, so far (AppImage)
+Requirements: An X86_64 machine with Linux installed. \
+Steps to begin:
+1. Download `FruitDetector-Linux-x64.tar.gz` from the latest release.
+2. Unpack it and make the launcher executable using the commands:
+```bash
+ tar xzf FruitDetector-Linux-x64.tar.gz
+ chmod +x FruitDetector/bin/FruitDetector
+```
+3. Run it from a terminal (so you can see any error messages):
+```bash   
+./FruitDetector/bin/FruitDetector
+```
+If there were no issues, a camera feed should show up, with a green box following what the network sees as a fruit.\
+Common issues:
+- "Permission denied" on start: run `chmod +x FruitDetector/bin/FruitDetector FruitDetector/lib/runtime/bin/*`. 
+- Camera won't open: try adding yourself to the video group with `sudo usermod -aG video $USER`, then log out and back in. If you have several cameras, the app tries the C270 first on `/dev/video2`, then the default camera, then any other camera it can open.
+- Missing .so error on a minimal Debian/Ubuntu: run the command `sudo apt install libxtst6 libxrender1 libxi6 libfreetype6 libfontconfig1 libasound2` in the terminal
+- Windows/macOS: not packaged yet. The build script can make packages on those systems with `./gradlew jpackage` (JDK 25 required).
+### Additional things to know
+  It knows 33 fruits and vegetables: apple, Granny Smith apple, apricot, avocado, banana, blueberry, cactus fruit, cantaloupe, cherry, clementine, corn, cucumber, blue grape, kiwi, lemon, lime, mango, white onion, orange, papaya, passion fruit, peach, pear, green pepper, red pepper, pineapple, plum, pomegranate, potato, raspberry, strawberry, tomato and watermelon.\
+  This is a convolutional network written in Java from scratch, so expect wrong predictions, especially if the background is cluttered\
+  The trained model is committed in `src/main/resources/model/` (`CNNState.bin`, `FFNWeights.bin`, `FFNBias.bin`) and is bundled into the app. To retrain, put images in `src/main/resources/train` (each file name must contain the fruit/class name) and run `./gradlew trainCNN`. That overwrites the three files above.

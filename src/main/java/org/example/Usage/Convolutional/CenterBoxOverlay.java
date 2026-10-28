@@ -38,7 +38,7 @@ public class CenterBoxOverlay extends JComponent {
 
         // bounding box
         g2d.setColor(Color.GREEN);
-        g2d.setStroke(new BasicStroke(3)); //3px thickness
+        g2d.setStroke(new BasicStroke(3));
         g2d.drawRect(startX, startY, boxX, boxY);
 
         // crosshair
@@ -53,7 +53,7 @@ public class CenterBoxOverlay extends JComponent {
             g2d.setColor(Color.BLACK);
             g2d.drawString(predictionText, startX + 2, startY - 8);
 
-            // Draw the actual yellow text
+            // draw text
             g2d.setColor(Color.YELLOW);
             g2d.drawString(predictionText, startX, startY - 10);
         }
