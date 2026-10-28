@@ -1,4 +1,4 @@
-package org.network.neuron;
+package org.network;
 
 public interface Neuron {
      void initializeHiddenLayers();

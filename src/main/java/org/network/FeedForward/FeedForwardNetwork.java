@@ -1,7 +1,8 @@
 package org.network.FeedForward;
 
+import org.network.Network;
 import org.network.util.Dataset;
-import org.network.neuron.Neuron;
+import org.network.Neuron;
 import org.network.util.util;
 import uk.ac.manchester.tornado.api.types.arrays.FloatArray;
 
@@ -14,9 +15,9 @@ import java.util.Random;
 import java.util.stream.IntStream;
 
 public class FeedForwardNetwork implements Network, Neuron {
-    public int inputSize;
-    public int hiddenLayerDepth;
-    public int outputSize;
+    public final int inputSize;
+    public final int hiddenLayerDepth;
+    public final int outputSize;
     public float[][] hiddenLayerWeights;
     public float[][] hiddenLayerBias;
     public float[] outputLayerWeights;

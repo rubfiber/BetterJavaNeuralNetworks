@@ -1,4 +1,4 @@
-package org.network.FeedForward;
+package org.network;
 
 import org.network.util.Dataset;
 
