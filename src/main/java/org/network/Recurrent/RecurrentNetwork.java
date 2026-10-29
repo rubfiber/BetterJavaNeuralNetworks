@@ -6,6 +6,8 @@ import org.network.util.util;
 import java.util.Arrays;
 import java.util.Random;
 
+import static org.network.util.util.sigmoid;
+
 public class RecurrentNetwork {
     public final int[] layers;
     public float[][] recurrentState;
@@ -23,6 +25,8 @@ public class RecurrentNetwork {
     public float[][] biasGradients;
     public Activation[] outputActivations;
     public Activation[][] hiddenActivations;
+
+    public float[][] recurrentWeights;
 
     public enum RecurrentTypes {
         MANY_TO_ONE,
@@ -52,6 +56,7 @@ public class RecurrentNetwork {
 
         Arrays.fill(outputActivations, Activation.SIGMOID);
 
+        recurrentWeights = new float[hiddenLayerDepth][];
         for (int i = 0; i < hiddenLayerDepth; i++) {
             int currentLayerSize = layers[i];
             int nextLayerSize = layers[i + 1];
@@ -65,12 +70,11 @@ public class RecurrentNetwork {
             hiddenActivations[i] = new Activation[nextLayerSize];
             Arrays.fill(hiddenActivations[i],  Activation.LEAKY_RELU);
 
-            recurrentState[i] = new float[currentLayerSize];
-            Arrays.fill(recurrentState[i], 0f);
+            recurrentWeights[i] = new float[nextLayerSize * nextLayerSize];
+            recurrentState[i] = new float[nextLayerSize];
+
 
         }
-        recurrentState[totalNetworkLength - 1] = new float[outputSize];
-        Arrays.fill(recurrentState[totalNetworkLength-1], 0f);
 
         previousOutput = new  float[outputSize];
         Arrays.fill(previousOutput, 0f); //for one to many
@@ -89,6 +93,10 @@ public class RecurrentNetwork {
             for (int j = 0; j < weightsRow.length; j++) {
                 weightsRow[j] = random.nextFloat(-limit, limit);
             }
+
+            float rLimit = (float) Math.sqrt(1.0 / numOutputs);
+            for (int j = 0; j < recurrentWeights[layer].length; j++)
+                recurrentWeights[layer][j] = random.nextFloat(-rLimit, rLimit);
         }
     }
 
@@ -99,36 +107,36 @@ public class RecurrentNetwork {
 
         float[] currentInput = input;
         for (int layer = 0; layer < hiddenLayerDepth; layer++) {
-            int inputS = layers[layer];
-            int outputS = layers[layer + 1];
-
+            int inS = layers[layer];
+            int outS = layers[layer + 1];
             float[] weights = hiddenLayerWeights[layer];
+            float[] recurrentWeight = recurrentWeights[layer];
             float[] bias = hiddenLayerBias[layer];
             float[] outputs = hiddenLayerOutputs[layer];
+            float[] prev = recurrentState[layer];
+            boolean isOutput = layer == hiddenLayerDepth - 1;
 
-            int wIndex = 0;
+            for (int o = 0; o < outS; o++) {
+                float sum = bias[o];
+                int wBase = o * inS;
+                for (int i = 0; i < inS; i++) sum += currentInput[i] * weights[wBase + i];
 
-            for (int outNeuron = 0; outNeuron < outputS; outNeuron++) { //next layer size
-                float sum = 0.0f;
-
-                for (int inNeuron = 0; inNeuron < inputS; inNeuron++) {
-                    sum += currentInput[inNeuron] * weights[wIndex++];
-                    if (type == RecurrentTypes.MANY_TO_MANY) sum += recurrentState[layer][inNeuron] * bias[wIndex++];
+                if (!isOutput) {
+                    int rBase = o * outS;
+                    for (int k = 0; k < outS; k++) sum += prev[k] * recurrentWeight[rBase + k];
                 }
-                sum += bias[outNeuron];
-                recurrentState[layer][outNeuron] = sum;
-
-                outputs[outNeuron] = (float) Math.tanh(sum);
-
-                if (layer == hiddenLayerDepth - 1) { // output layer
-                    previousOutput = outputs;
-                }
+                outputs[o] = isOutput ? sigmoid(sum) : (float) Math.tanh(sum);
             }
 
+            if (!isOutput) System.arraycopy(outputs, 0, prev, 0, outS); // update state after the layer
             currentInput = outputs;
         }
 
-
-        return hiddenLayerOutputs[hiddenLayerDepth - 1];
+        previousOutput = hiddenLayerOutputs[hiddenLayerDepth - 1].clone();
+        return previousOutput;
+    }
+    public void resetState() {
+        for (float[] s : recurrentState) Arrays.fill(s, 0f);
+        Arrays.fill(previousOutput, 0f);
     }
 }
