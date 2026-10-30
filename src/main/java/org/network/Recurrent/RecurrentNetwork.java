@@ -1,7 +1,6 @@
 package org.network.Recurrent;
 
 import org.network.FeedForward.Activation;
-import org.network.util.util;
 
 import java.util.Arrays;
 import java.util.Random;
@@ -100,7 +99,7 @@ public class RecurrentNetwork {
         }
     }
 
-    public float[] predict(float[] input, RecurrentTypes type) {
+    public float[] predict(float[] input) {
         if (input.length != inputSize) {
             throw new IllegalArgumentException("FATAL: Network expected input of size " + inputSize + " but got " + input.length);
         }
@@ -135,6 +134,7 @@ public class RecurrentNetwork {
         previousOutput = hiddenLayerOutputs[hiddenLayerDepth - 1].clone();
         return previousOutput;
     }
+
     public void resetState() {
         for (float[] s : recurrentState) Arrays.fill(s, 0f);
         Arrays.fill(previousOutput, 0f);
