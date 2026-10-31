@@ -33,7 +33,14 @@ public class ConvolutionalNetwork {
     public int[] filters;
     public int gridSize = 4;
 
-
+    /**
+     * Convolutional networks are for processing visual input more efficiently. It uses a filter to slide over an image and perform matrix math before producing an output.
+     * @param builder Used to simplify the parameters for the constructor to make it easier to read
+     * @param FFNLayers - The layers of the feedforward network - each element in the array is a list
+     * @param filters - How the flters that slide over the image are structured
+     * @param inputChannels - The number of channels that the image is in (3 for RGB for example)
+     * @param stride - How much the filter moves by
+     */
     public ConvolutionalNetwork(filterBuilder builder, int[] FFNLayers, int[] filters, int[] inputChannels, int[] stride) {
         this.filterSize = FFNLayers.length;
         this.filters = filters;
@@ -50,7 +57,11 @@ public class ConvolutionalNetwork {
         }
     }
 
-
+    /**
+     * Uses the im2col algorithm instead of just sliding over an image to produce an output
+     * @param initialImage The image being passed into the forward pass, where the filters will perform im2col and pooling on
+     * @return A 3D float array representing the final layer output
+     */
     public float[][][] forwardPass(float[][][] initialImage) {
         float[][][] currentMap = initialImage; //raw image
 
@@ -65,6 +76,11 @@ public class ConvolutionalNetwork {
         return currentMap;
     }
 
+    /**
+     * Used to run the network to make a prediction based on its inputs
+     * @param image The input image that the model makes its prediction based on
+     * @return The model's array of predictions
+     */
     public float[] predict(float[][][] image) {
         float[][][] cnnOutput = forwardPass(image);
         float[] flattenedImage = util.flatten3D(cnnOutput);
@@ -94,6 +110,12 @@ public class ConvolutionalNetwork {
         }
         return w;
     }
+
+    /**
+     * Trains the model based on a single image and the desired output
+     * @param image The single image that the model performs math to find errors
+     * @param desiredOutput The output that you want the model to output based on what is in the image
+     */
     public void train(float[][][] image, float[] desiredOutput) {
         float[][][] cnnOutput = forwardPass(image);
         int lastNumFilters = cnnOutput.length;         // depth/channels
@@ -125,6 +147,14 @@ public class ConvolutionalNetwork {
         }
     }
 
+    /**
+     * The complete training method for the model by using the train method inside on many images
+     * @param imageInputs The complete dataset of images - should be varied for different backgrounds if necessary
+     * @param desiredOutputs The outputs that you want each model to predict based on each image in the dataset
+     * @param learningRate How much the model learns - too high and the model overshoots, but too low and the model does not learn much
+     * @param batchSize How much the model learns at a time
+     * @param epochs How many times the model learns using the same data
+     */
     public void trainDataset(float[][][][] imageInputs, float[][] desiredOutputs, float learningRate, int batchSize, int epochs) {
         int numSamples = imageInputs.length;
 
@@ -166,6 +196,12 @@ public class ConvolutionalNetwork {
 
     public boolean useYoloLoss = true;
 
+    /**
+     * Diagnostics used for checking if the network is training well
+     * @param images The images that were inputted in the train dataset method
+     * @param targets The targets that are also the desired outputs in the train dataset method
+     * @param maxSamples The number of samples that the diagnostic takes to gather information
+     */
     public void printDiagnostics(float[][][][] images, float[][] targets, int maxSamples) {
         int cells = gridSize * gridSize;
         int fpc = targets[0].length / cells;      // features per cell
@@ -260,6 +296,13 @@ public class ConvolutionalNetwork {
         public int batchSize;
         public int kernelSize;
 
+        /**
+         * Used for building the filter
+         * @param inputSize size of the input
+         * @param padding added to the sides of all images before the filter slides over
+         * @param batchSize Amount of batches that the model trains using
+         * @param kernelSize The size of the filter that slides over the image
+         */
         public filterBuilder(int[][] inputSize, int[] padding, int batchSize, int kernelSize) {
             this.inputSize = inputSize;
             this.padding = padding;
@@ -287,6 +330,15 @@ public class ConvolutionalNetwork {
         int numFilters;
         int gridSize;
 
+        /**
+         * The layers that matrix math for the filters are held
+         * @param inChannels The number of channels that the images have - for exaple 3 for RGB
+         * @param numFilters The number of filters that the layer has
+         * @param stride How far the filter moves
+         * @param padding Added to the ends of the image
+         * @param gridSize The number of grids when using YOLO style grids
+         * @param kernelSize The size of the filter
+         */
         public ConvolutionalLayer(int inChannels, int numFilters, int stride, int[] padding, int gridSize, int kernelSize) {
             this.numFilters = numFilters;
             this.stride = stride;
@@ -318,6 +370,14 @@ public class ConvolutionalNetwork {
         int lastInWidth;
         float[][] lastWeightRow;
 
+        /**
+         * The matrix multiplication algorithm used instead of just moving the kernel
+         * @param input The input image that the math is performed on
+         * @param weights The weight array for the layer
+         * @param stride How far the filter moves
+         * @param pad Added to the ends of the image
+         * @return The output feature map
+         */
         public float[][][] im2col(float[][][] input, float[][][][] weights, int stride, int pad) { //channels, col, row
             int inChannels = input.length;
             int inHeight = input[0].length;
@@ -957,7 +1017,7 @@ public class ConvolutionalNetwork {
                 }
             }
 
-            String label = "NOLABEL";
+            String label = "LABEL";
             for (int c = 0; c < cells; c++) {
                 if (outputs[i][c * fpc] > 0.5f) {
                     int best = 0;
