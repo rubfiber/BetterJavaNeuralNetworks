@@ -50,8 +50,9 @@ public class LSTM {
             this.lstmLayerDepth = totalNetworkLength - 2;
 
 
-            hiddenState = new float[hiddenLayerDepth][];
-            cellState = new float[hiddenLayerDepth][];
+            hiddenState = new float[lstmLayerDepth][];
+            cellState = new float[lstmLayerDepth][];
+
 
             // gates
             forgetGateWeights = new float[hiddenLayerDepth][];
@@ -85,9 +86,12 @@ public class LSTM {
 
             final Random random = new Random();
 
-            for (int i = 0; i < hiddenLayerDepth-1; i++) {
+            for (int i = 0; i < lstmLayerDepth; i++) {
                 int numInputs = layers[i];
                 int numOutputs = layers[i + 1];
+                int numHidden = layers[i + 1];
+                hiddenState[i] = new float[numHidden];
+                cellState[i] = new float[numHidden];
 
                 // combined input size when adding/concatanating
                 int combinedInputSize = numInputs + numOutputs;
@@ -132,7 +136,7 @@ public class LSTM {
                 throw new IllegalArgumentException("FATAL: Network expected input of size " + inputSize + " but got " + input.length);
             }
             float[] currentLayerInput = input;
-            for (int layer = 0; layer <= lstmLayerDepth; layer++) {
+            for (int layer = 0; layer < lstmLayerDepth; layer++) {
                 int numInputs = layers[layer];
                 int numHidden = layers[layer + 1];
                 int combinedInputSize = numInputs + numHidden;
@@ -143,10 +147,10 @@ public class LSTM {
 
                 for (int j = 0; j < numHidden; j++) {
                     int offset = j * combinedInputSize;
-                    float forgetSum = forgetGateBias[layer][offset];
-                    float inputSum = inputGateBias[layer][offset];
-                    float candidateSum = candidateBias[layer][offset];
-                    float outputSum = outputGateBias[layer][offset];
+                    float forgetSum = forgetGateBias[layer][j];
+                    float inputSum = inputGateBias[layer][j];
+                    float candidateSum = candidateBias[layer][j];
+                    float outputSum = outputGateBias[layer][j];
 
                     for (int k = 0; k < combinedInputSize; k++) {
                         int weightIdx = offset + k;
