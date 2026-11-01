@@ -37,7 +37,7 @@ public class ConvolutionalNetwork {
      * Convolutional networks are for processing visual input more efficiently. It uses a filter to slide over an image and perform matrix math before producing an output.
      * @param builder Used to simplify the parameters for the constructor to make it easier to read
      * @param FFNLayers - The layers of the feedforward network - each element in the array is a list
-     * @param filters - How the flters that slide over the image are structured
+     * @param filters - How the filters that slide over the image are structured
      * @param inputChannels - The number of channels that the image is in (3 for RGB for example)
      * @param stride - How much the filter moves by
      */
@@ -332,7 +332,7 @@ public class ConvolutionalNetwork {
 
         /**
          * The layers that matrix math for the filters are held
-         * @param inChannels The number of channels that the images have - for exaple 3 for RGB
+         * @param inChannels The number of channels that the images have - for example 3 for RGB
          * @param numFilters The number of filters that the layer has
          * @param stride How far the filter moves
          * @param padding Added to the ends of the image

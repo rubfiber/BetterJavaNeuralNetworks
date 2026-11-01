@@ -27,7 +27,7 @@ public class ConvolutionalTrainer {
         this.dataPath = dataPath;
 
     }
-    void train() {
+    public void train() {
 
         System.out.println("Building YOLO-style Convolutional Neural Network...");
 

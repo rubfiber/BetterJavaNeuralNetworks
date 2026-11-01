@@ -37,7 +37,7 @@ public class ConvolutionalBuilderWebcam {
         this.FFNBiasPath = FFNBiasPath;
 
     }
-      void run() throws NoSuchElementException, IOException {
+      public void run() throws NoSuchElementException, IOException {
 
         int[][] dummyInputSize = new int[32][32];
         ConvolutionalNetwork.filterBuilder builder = new ConvolutionalNetwork.filterBuilder(dummyInputSize, padding, 32, 3);

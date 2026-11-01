@@ -27,11 +27,6 @@ public class RecurrentNetwork {
 
     public float[][] recurrentWeights;
 
-    public enum RecurrentTypes {
-        MANY_TO_ONE,
-        ONE_TO_MANY,
-        MANY_TO_MANY
-    }
 
     public RecurrentNetwork(int[] layers) { //input
         this.layers = layers;
