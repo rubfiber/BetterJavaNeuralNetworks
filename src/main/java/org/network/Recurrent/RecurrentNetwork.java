@@ -173,7 +173,7 @@ public class RecurrentNetwork {
             this.outputs = outputs;
         }
     }
-    public float backward(float[][] targets) {
+    public float backwardPass(float[][] targets) {
         final int totalTime = history.size();
         final float EPS = 1e-7f;
 
@@ -298,7 +298,7 @@ public class RecurrentNetwork {
         }
             zeroGradients();
             forwardSequence(inputs);
-            float loss = backward(targets);
+            float loss = backwardPass(targets);
             if (maxNorm > 0f) {
                 clipGradients(maxNorm);
             }
@@ -314,11 +314,11 @@ public class RecurrentNetwork {
         int numSequences = datasetInput.length;
         int[] indices = new int[numSequences];
         for (int i = 0; i < numSequences; i++) indices[i] = i;
-        Random rng = new Random();
+        Random random = new Random();
 
         for (int epoch = 1; epoch <= epochs; epoch++) {
             for (int i = numSequences - 1; i > 0; i--) {
-                int swapIdx = rng.nextInt(i + 1);
+                int swapIdx = random.nextInt(i + 1);
                 int temp = indices[i];
                 indices[i] = indices[swapIdx];
                 indices[swapIdx] = temp;
