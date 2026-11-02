@@ -3,20 +3,10 @@ package org.example.Usage.Recurrent;
 import java.util.Arrays;
 import java.util.function.Function;
 
-/**
- * Tests a trained RNN with its predict function on data it has not trained on.
- *
- * predict takes one sequence, float[timestep][feature], and must return
- * float[timestep][output]. Wrap your own predict in a lambda to match (see main).
- */
-public final class RnnCheck {
+
+public class RnnCheck {
     private RnnCheck() {}
 
-    /**
-     * @param skipSteps number of leading steps to ignore (use the delay for delayedEcho,
-     *                  because those targets are always 0 and prove nothing)
-     * @return accuracy over all counted steps
-     */
     public static double evaluate(Function<float[][], float[][]> predict,
                                   float[][][] inputs, float[][][] targets, int skipSteps) {
         int correct = 0, total = 0;
@@ -60,7 +50,6 @@ public final class RnnCheck {
         return acc;
     }
 
-    // one output: threshold at 0.5. several outputs: the largest one must match the target's largest.
     private static boolean isCorrect(float[] out, float[] target) {
         if (target.length == 1) return (out[0] >= 0.5f) == (target[0] >= 0.5f);
         return argmax(out) == argmax(target);
@@ -83,9 +72,8 @@ public final class RnnCheck {
         return d;
     }
 
-    /** Demo with two fake predictors, to show what the output looks like. Replace with your RNN. */
-    public static void main(String[] args) {
-        float[][][][] data = SampleData.delayedEcho(100, 8, 1, 999);   // fresh seed, not the training one
+    static void main() {
+        float[][][][] data = SampleData.delayedEcho(100, 8, 1, 999);
 
         System.out.println("A predictor that echoes perfectly:");
         evaluate(seq -> {

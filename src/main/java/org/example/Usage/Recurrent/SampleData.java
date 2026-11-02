@@ -1,24 +1,12 @@
 package org.example.Usage.Recurrent;
 
 import java.util.Random;
+import java.util.Arrays;
 
-/**
- * Sample data for RecurrentNetwork.train(datasetInput, datasetTarget, ...).
- *
- * Shapes:  input[sequence][timestep][inputFeature]
- *          target[sequence][timestep][outputValue]
- *
- * Every target value is 0 or 1, which fits a sigmoid output layer.
- * Each generator returns {input, target}.
- */
-public final class SampleData {
+public class SampleData {
     private SampleData() {}
 
-    /**
-     * Delayed echo: the target at step t is the input bit from step t - delay (0 before that).
-     * Needs a network with inputSize = 1, outputSize = 1.
-     * The easiest memory test: start with delay = 1.
-     */
+
     public static float[][][][] delayedEcho(int numSequences, int seqLength, int delay, long seed) {
         Random rnd = new Random(seed);
         float[][][] input = new float[numSequences][seqLength][1];
@@ -32,11 +20,7 @@ public final class SampleData {
         return new float[][][][]{input, target};
     }
 
-    /**
-     * Running parity: the target at step t is 1 if the number of 1s seen so far is odd.
-     * Needs inputSize = 1, outputSize = 1. Harder than the echo: the network must carry
-     * one bit of state through every step. Keep seqLength short (5 to 10) at first.
-     */
+
     public static float[][][][] runningParity(int numSequences, int seqLength, long seed) {
         Random rnd = new Random(seed);
         float[][][] input = new float[numSequences][seqLength][1];
@@ -53,12 +37,7 @@ public final class SampleData {
         return new float[][][][]{input, target};
     }
 
-    /**
-     * Next symbol: each sequence cycles through the symbols 0..k-1 from a random start
-     * (for example 2, 0, 1, 2, 0, ...). The input is the one-hot current symbol and the
-     * target is the one-hot next symbol.
-     * Needs inputSize = numSymbols, outputSize = numSymbols. A good multi-output sanity check.
-     */
+
     public static float[][][][] nextSymbol(int numSequences, int seqLength, int numSymbols, long seed) {
         Random rnd = new Random(seed);
         float[][][] input = new float[numSequences][seqLength][numSymbols];
