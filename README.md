@@ -1,8 +1,9 @@
 # Java Neural Nets
 
-These are neural networks written from scratch in Java. Currently, this library supports two architectures:
+These are neural networks written from scratch in Java. Currently, this library supports three architectures:
 1. **Feedforward Neural Networks (FFN)** (`org.network.FeedForward.FeedForwardNetwork`)
 2. **Convolutional Neural Networks (CNN)** (`org.network.Convolutional.ConvolutionalNetwork`) — supporting both standard image classification and YOLO-style grid object detection & localization.
+3. **Recurrent Neural Networks (RNN)** (`org.network.Recurrent.RecurrentNetwork`) — supporting sequence modeling with Backpropagation Through Time (BPTT) and gradient clipping.
 
 ---
 
@@ -157,6 +158,73 @@ cnn.loadState(
     "FFNBias.bin"
 );
 ```
+
+---
+
+## 3. Recurrent Neural Network (`RecurrentNetwork`)
+
+You can use the `org.network.Recurrent.RecurrentNetwork` class for sequential tasks where previous recorded outputs/states need to be remembered across time. Hidden layers use $\tanh$ activations with recurrent state connections, while the final layer acts as a dense feedforward-like layer with sigmoid activation
+
+### Initialization
+Pass an `int[]` array specifying the input size, one or more recurrent hidden layer sizes, and the final output size:
+
+```java
+int[] layers = {1, 16, 1}; // 1 Input -> 16 Recurrent Hidden Units -> 1 Output
+RecurrentNetwork rnn = new RecurrentNetwork(layers);
+```
+
+### Training
+Train the network across a dataset of sequences using `train(float[][][] datasetInput, float[][][] datasetTarget, int epochs, float learningRate, float maxNorm)`:
+```java
+// Generate synthetic delayed-echo sequence data: 200 sequences, length 8, delay 1
+float[][][][] trainData = SampleData.delayedEcho(200, 8, 1, 42);
+
+// Train for 100 epochs with learningRate = 0.05f and gradient clipping maxNorm = 5.0f
+rnn.train(trainData[0], trainData[1], 100, 0.05f, 5.0f);
+```
+- `datasetInput`: `float[][][]` format as `[sequenceIndex][timeStep][inputFeature]`
+- `datasetTarget`: `float[][][]` formatted as `[sequenceIndex][timeStep][outputValue]` (values between 0 and 1). For many-to-one tasks, unsupervised time steps can be set to `null`.
+- `epochs`: Number of full training loops/passes the network completes.
+- `learningRate`: Step size for Stochastic Gradient Descent (`sgdStep`).
+- `maxNorm`: Gradient norm clipping threshold to prevent exploding gradients during during backprop through time. Set to `<= 0` to disable clipping, but might cause exploding gradients
+
+You can also train on a single sequence at a time using `trainSequence`:
+```java
+float loss = rnn.trainSequence(singleSeqInputs, singleSeqTargets, 0.05f, 5.0f);
+```
+
+### Predictions & State Management
+Because an RNN maintains internal memory (`recurrentState`) across time steps, call `rnn.resetState()` before starting a new independent sequence:
+
+```java
+rnn.resetState();
+for (int t = 0; t < sequence.length; t++) {
+    float[] output = rnn.predict(sequence[t]);
+}
+```
+Alternatively, you can run an entire sequence at once (which automatically resets state at the start):
+```java
+float[][] sequenceOutputs = rnn.forwardSequence(sequence);
+```
+
+### Evaluation & Sample Benchmarks
+The `org.example.Usage.Recurrent` package includes sequence generators (`SampleData`) and an evaluator (`RnnCheck`):
+- `SampleData.delayedEcho(numSequences, seqLength, delay, seed)`: Tests short-term memory by forcing the network to output inputs from `delay` steps ago.
+- `SampleData.runningParity(numSequences, seqLength, seed)`: Tests state-tracking by outputting `1` when the running count of `1`s seen so far is odd.
+- `SampleData.nextSymbol(numSequences, seqLength, numSymbols, seed)`: Tests multi-output sequence prediction
+
+```java
+float[][][][] test = SampleData.delayedEcho(100, 8, 1, 999);
+RnnCheck.evaluate(seq -> {
+    rnn.resetState();
+    float[][] out = new float[seq.length][];
+    for (int t = 0; t < seq.length; t++) out[t] = rnn.predict(seq[t]);
+    return out;
+}, test[0], test[1], 1);
+```
+
+---
+
 ## Try it out
 ### Linux X64 only, so far (AppImage)
 Requirements: An X86_64 machine with Linux installed. \
