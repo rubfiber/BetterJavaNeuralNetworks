@@ -26,9 +26,9 @@ test {
     useJUnitPlatform()
 }
 
-def appName       = 'FruitDetector'
+def appName       = 'RNN Test'
 def appVersionStr = '1.0.0'
-def appMainClass  = 'org.example.Usage.Main'
+def appMainClass  = 'org.example.Usage.Recurrent.Recurrent'
 def jvmOptions    = ['-Xmx2g']
 
 def osName    = System.getProperty('os.name').toLowerCase()
@@ -93,7 +93,7 @@ tasks.register('jpackage', Exec) {
 
 
 processResources {
-    exclude 'train/**', 'captured_images/**'
+    exclude 'train/**', 'captured_images/**', 'archive/**'
 }
 
 tasks.register('trainCNN', JavaExec) {
